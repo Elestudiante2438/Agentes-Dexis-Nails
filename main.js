@@ -460,7 +460,7 @@ const agentColorsMap = {
     Memoria: 0xFF3333, Valorador: 0xFF8800, Faro: 0xDDEEFF,
 };
 
-document.getElementById('statusMsg')?.style.setProperty('display', 'none');
+// statusMsg visible para feedback al usuario
 
 // Color reusable para el titileo (evita new THREE.Color() en cada frame)
 const _edgeColor = new THREE.Color();
@@ -493,14 +493,31 @@ function setSilenceMode() {
 
 async function getDexiResponse(userText) {
     const lower = userText.toLowerCase();
+
+    // Diagnóstico: confirma que se recibió texto
+    console.log('[Dexis] texto recibido:', userText);
+    console.log('[Dexis] window.agentes disponible:', !!window.agentes);
+    console.log('[Dexis] window.decidirAgente disponible:', !!window.decidirAgente);
+
     if (lower.includes('dexis'))
         return { respuesta: "Soy Dexis, tu asistente. ¿En qué te ayudo?", agenteNombre: 'Dexis' };
     if (lower.includes('ayuda'))
         return { respuesta: "Claro. Puedes reservar servicios de manicura, pedicura, podología, uñas de gel, faciales, o consultar por colonias árabes. ¿Qué necesitas?", agenteNombre: 'Dexis' };
 
-    const context = window.getContextString?.() ?? '';
-    const agenteNombre = window.decidirAgente?.(userText, context) ?? 'Tejedora';
-    const newColor = agentColorsMap[agenteNombre] ?? 0xFFFFFF;
+    // Si agents.js no se cargó aún, respuesta de emergencia informativa
+    if (!window.agentes || !window.decidirAgente) {
+        console.warn('[Dexis] agents.js no está cargado — respuesta de emergencia');
+        return {
+            respuesta: "Hola, soy Dexis. El sistema de agentes todavía está cargando. Intenta en un momento o di 'ayuda' para ver los servicios disponibles.",
+            agenteNombre: 'Dexis'
+        };
+    }
+
+    const context      = window.getContextString?.() ?? '';
+    const agenteNombre = window.decidirAgente(userText, context) ?? 'Tejedora';
+    const newColor     = agentColorsMap[agenteNombre] ?? 0xFFFFFF;
+
+    console.log('[Dexis] agente seleccionado:', agenteNombre);
 
     if (lastAgentColor !== newColor) {
         lastAgentColor = newColor;
@@ -508,8 +525,12 @@ async function getDexiResponse(userText) {
         setNucleusColor(newColor);
     }
 
-    const agente = window.agentes?.[agenteNombre];
-    if (!agente) return { respuesta: "Lo siento, no entiendo. ¿Puedes repetir?", agenteNombre: 'Dexis' };
+    const agente = window.agentes[agenteNombre];
+    if (!agente) {
+        console.warn('[Dexis] agente no encontrado:', agenteNombre);
+        return { respuesta: "No encontré al agente indicado. Di 'ayuda' para ver qué puedo hacer.", agenteNombre: 'Dexis' };
+    }
+
     const respuesta = await agente.responder(userText, context);
     return { respuesta, agenteNombre };
 }
@@ -520,6 +541,17 @@ async function processUserText(text) {
     const { respuesta, agenteNombre } = await getDexiResponse(text);
     window.addToMemory?.('dexi', respuesta);
     speakResponse(respuesta);
+
+    // Mostrar en statusMsg qué agente respondió
+    const statusEl = document.getElementById('statusMsg');
+    if (statusEl) {
+        statusEl.innerHTML = `🤖 ${agenteNombre}: ${respuesta.substring(0, 80)}${respuesta.length > 80 ? '…' : ''}`;
+        setTimeout(() => {
+            if (listeningActive) statusEl.innerHTML = '🎤 Escuchando…';
+            else statusEl.innerHTML = '⚪ Sistema listo';
+        }, 5000);
+    }
+
     window.guardarConversacion?.(text, respuesta, agenteNombre);
 }
 
@@ -533,16 +565,58 @@ function speakResponse(text) {
     window.speechSynthesis.speak(u);
 }
 
-function startListening() {
+async function startListening() {
     if (listeningActive) return;
+
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
+    if (!SR) {
+        const statusEl = document.getElementById('statusMsg');
+        if (statusEl) statusEl.innerHTML = '❌ Este navegador no soporta reconocimiento de voz';
+        return;
+    }
+
+    // Pedir permiso del micrófono explícitamente antes de empezar
+    // Esto hace que el navegador muestre el diálogo si no hay permiso aún
+    try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+        const statusEl = document.getElementById('statusMsg');
+        if (statusEl) statusEl.innerHTML = '🎤 Activa el micrófono en tu navegador para continuar';
+        console.warn('[Dexis] Permiso de micrófono denegado:', err.message);
+        return;
+    }
+
     recognition = new SR();
     recognition.continuous = true;
+    recognition.interimResults = false;
     recognition.lang = 'es-CO';
-    recognition.onstart  = () => { listeningActive = true; setListeningMode(); };
-    recognition.onend    = () => { if (listeningActive) stopListening(); };
-    recognition.onerror  = () => stopListening();
+
+    recognition.onstart = () => {
+        listeningActive = true;
+        const statusEl = document.getElementById('statusMsg');
+        if (statusEl) statusEl.innerHTML = '🎤 Escuchando…';
+        setListeningMode();
+    };
+
+    recognition.onend = () => {
+        // En móvil la API corta el recognition automáticamente entre frases.
+        // Si el usuario todavía tiene el dedo presionado (isPressing), reiniciar.
+        if (listeningActive && typeof isPressing !== 'undefined' && isPressing) {
+            try { recognition.start(); } catch(e) { /* ya está iniciando */ }
+        } else if (listeningActive) {
+            stopListening();
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.warn('[Dexis] Error de reconocimiento:', event.error);
+        // 'aborted' ocurre al detener manualmente — no es un error real
+        // 'no-speech' ocurre cuando no se detecta voz — no matar, solo loggear
+        if (event.error === 'aborted' || event.error === 'no-speech') return;
+        // Para cualquier otro error sí detenemos
+        stopListening();
+    };
+
     recognition.onresult = (event) => {
         let finalText = '';
         for (let i = event.resultIndex; i < event.results.length; i++)
@@ -553,12 +627,20 @@ function startListening() {
             setTimeout(() => { if (listeningActive) setListeningMode(); else setSilenceMode(); }, 1000);
         }
     };
-    recognition.start();
+
+    try {
+        recognition.start();
+    } catch(e) {
+        console.warn('[Dexis] No se pudo iniciar recognition:', e.message);
+    }
 }
 
 function stopListening() {
-    recognition?.stop(); recognition = null;
+    try { recognition?.stop(); } catch(e) { /* ignorar si ya estaba parado */ }
+    recognition = null;
     listeningActive = false;
+    const statusEl = document.getElementById('statusMsg');
+    if (statusEl) statusEl.innerHTML = '⚪ Sistema listo';
     setSilenceMode();
 }
 
@@ -699,19 +781,17 @@ function startPressToTalk(e) {
     e.preventDefault();
     if (isPressing) return;
     isPressing = true;
-    
+
     // Cambiar visual del botón
     btnListen.style.background = '#6c5ce7';
     btnListen.style.transform = 'scale(0.96)';
-    
-    // Iniciar reconocimiento de voz
+
+    // Iniciar reconocimiento de voz (async — pide permiso si es necesario)
     startListening();
-    
+
     // Apagar automáticamente después de 10 segundos por si acaso
     pressTimer = setTimeout(() => {
-        if (isPressing) {
-            stopPressToTalk();
-        }
+        if (isPressing) stopPressToTalk();
     }, 10000);
 }
 
