@@ -46,7 +46,7 @@ body {
 /* BOTONES TÁCTILES */
 #mobile-buttons {
     position: fixed;
-    bottom: 20px;
+    bottom: 80px;
     left: 0;
     right: 0;
     display: flex;
@@ -90,6 +90,9 @@ body {
     #statusMsg {
         font-size: 10px;
         top: 10px;
+    }
+    #mobile-buttons {
+        bottom: 70px;
     }
     .voice-btn {
         padding: 10px 16px;
