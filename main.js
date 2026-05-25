@@ -418,25 +418,41 @@ function setSilenceMode() {
     currentRingSpeed = normalRingSpeed;
 }
 
-// Función principal: usa directo a window.Dexis
 async function getDexiResponse(userText) {
     const lower = userText.toLowerCase();
 
+    // Respuestas directas sin pasar por DeepSeek
     if (lower.includes('dexis'))
         return { respuesta: "Soy Dexis, tu asistente. ¿En qué te ayudo?", agenteNombre: 'Dexis' };
     if (lower.includes('ayuda'))
         return { respuesta: "Claro. Puedes reservar servicios de manicura, pedicura, podología, uñas de gel, faciales, o consultar por colonias árabes. ¿Qué necesitas?", agenteNombre: 'Dexis' };
 
+    // Verificar que agents.js cargó
     if (!window.Dexis || typeof window.Dexis.responder !== 'function') {
-        console.warn('[Dexis] window.Dexis no disponible');
+        console.warn('[Dexis] agents.js no está cargado todavía');
         return {
-            respuesta: "Estoy aquí. Mis sistemas están listos. ¿En qué te ayudo?",
+            respuesta: "Estoy iniciando. Espera un momento e intenta de nuevo.",
             agenteNombre: 'Dexis'
         };
     }
 
-    const respuesta = await window.Dexis.responder(userText);
-    return { respuesta, agenteNombre: 'Dexis' };
+    // Colorear el núcleo según el agente visual
+    const agenteNombre = window.decidirAgente?.(userText, '') ?? 'Tejedora';
+    const newColor = agentColorsMap[agenteNombre] ?? 0xFFFFFF;
+    if (lastAgentColor !== newColor) {
+        lastAgentColor = newColor;
+        permanentColor = newColor;
+        setNucleusColor(newColor);
+    }
+
+    // Llamar a Dexis — agents.js ya maneja todos los errores internamente
+    try {
+        const respuesta = await window.Dexis.responder(userText);
+        return { respuesta, agenteNombre };
+    } catch (err) {
+        console.error('[Dexis] Error inesperado en getDexiResponse:', err.message);
+        return { respuesta: 'Hubo un error inesperado. ¿Puedes intentarlo de nuevo?', agenteNombre: 'Dexis' };
+    }
 }
 
 async function processUserText(text) {
