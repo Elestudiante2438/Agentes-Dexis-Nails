@@ -72,8 +72,6 @@ const rimLight = new THREE.PointLight(0xff8833, 1.0, 15);
 rimLight.position.set(-1, 1, -3);
 scene.add(rimLight);
 
-scene.add(new THREE.PointLight(0xffffff, 0.5, 12).position.set(0, 6, 0) && new THREE.PointLight(0xffffff, 0.5, 12));
-// (forma simple — mejor explícita:)
 const topLight = new THREE.PointLight(0xffffff, 0.5, 12);
 topLight.position.set(0, 6, 0);
 scene.add(topLight);
@@ -521,6 +519,12 @@ async function processUserText(text) {
     window.addToMemory?.('dexi', respuesta);
     speakResponse(respuesta);
     window.guardarConversacion?.(text, respuesta, agenteNombre);
+    
+    // ✅ AGREGADO: También mostrar en el chat de texto si existe
+    if (window.addChatMessageFromMain) {
+        window.addChatMessageFromMain(text, 'user');
+        window.addChatMessageFromMain(respuesta, 'dexis');
+    }
 }
 
 function speakResponse(text) {
@@ -673,3 +677,76 @@ function animate() {
 animate();
 
 console.log('✨ Dexis — Universo 3D mejorado ✨');
+
+// =============================================
+// 10. CHAT DE TEXTO (agregado sin borrar nada)
+// =============================================
+
+let chatInput, chatMessages, chatSendBtn;
+
+function initChat() {
+    chatInput = document.getElementById('chat-input');
+    chatMessages = document.getElementById('chat-messages');
+    chatSendBtn = document.getElementById('chat-send');
+    
+    if (!chatInput) {
+        console.warn('Chat no encontrado en el DOM');
+        return;
+    }
+    
+    chatSendBtn.addEventListener('click', sendChatMessage);
+    
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            sendChatMessage();
+        }
+    });
+    
+    // Exponer función para que processUserText pueda agregar mensajes al chat
+    window.addChatMessageFromMain = addChatMessage;
+    
+    console.log('✅ Chat de texto inicializado');
+}
+
+async function sendChatMessage() {
+    const message = chatInput.value.trim();
+    if (!message) return;
+    
+    addChatMessage(message, 'user');
+    chatInput.value = '';
+    
+    chatInput.disabled = true;
+    chatSendBtn.disabled = true;
+    
+    try {
+        if (!window.Dexis || typeof window.Dexis.responder !== 'function') {
+            throw new Error('Dexis no está disponible');
+        }
+        const respuesta = await window.Dexis.responder(message);
+        addChatMessage(respuesta, 'dexis');
+    } catch (error) {
+        console.error('Error al llamar a Dexis:', error);
+        addChatMessage('Lo siento, hubo un error. Intenta de nuevo.', 'dexis');
+    }
+    
+    chatInput.disabled = false;
+    chatSendBtn.disabled = false;
+    chatInput.focus();
+}
+
+function addChatMessage(text, sender) {
+    if (!chatMessages) return;
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `${sender}-message`;
+    messageDiv.textContent = text;
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Esperar a que el DOM cargue
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initChat);
+} else {
+    initChat();
+}
