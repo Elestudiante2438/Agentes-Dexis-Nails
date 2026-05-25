@@ -84,8 +84,7 @@ body {
 
 @media (max-width: 768px) {
     #shortcuts {
-        font-size: 10px;
-        bottom: 10px;
+        display: none;
     }
     #statusMsg {
         font-size: 10px;
