@@ -2,26 +2,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // =============================================
-// ESPERAR A QUE agents.js CARGUE
+// 0. NO BLOQUEAMOS — agents.js ya está en el HTML antes que main.js
 // =============================================
-await new Promise((resolve) => {
-    if (window.agentes && window.decidirAgente) {
-        resolve();
-    } else {
-        const checkInterval = setInterval(() => {
-            if (window.agentes && window.decidirAgente) {
-                clearInterval(checkInterval);
-                resolve();
-            }
-        }, 50);
-        setTimeout(() => {
-            clearInterval(checkInterval);
-            console.warn('Timeout esperando agents.js');
-            resolve();
-        }, 5000);
-    }
-});
-console.log('✅ agents.js cargado correctamente');
+console.log('✅ main.js iniciado - agents.js debe estar cargado previamente');
 
 // =============================================
 // 1. CONFIGURACIÓN GLOBAL
@@ -455,7 +438,7 @@ async function getDexiResponse(userText) {
     if (!window.agentes || !window.decidirAgente) {
         console.warn('[Dexis] agents.js no está cargado — respuesta de emergencia');
         return {
-            respuesta: "Hola, soy Dexis. El sistema de agentes todavía está cargando. Intenta en un momento o di 'ayuda' para ver los servicios disponibles.",
+            respuesta: "Hola, soy Dexis. El sistema de agentes está cargando. Intenta de nuevo o di 'ayuda'.",
             agenteNombre: 'Dexis'
         };
     }
