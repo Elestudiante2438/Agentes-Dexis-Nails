@@ -1,0 +1,56 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+#shortcuts {
+    position: absolute;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(0, 0, 0, 0.85);
+    padding: 8px 16px;
+    border-radius: 30px;
+    font-size: 14px;
+    font-family: monospace;
+    pointer-events: none;
+    z-index: 10;
+    width: fit-content;
+    margin: 0 auto;
+    backdrop-filter: blur(4px);
+    letter-spacing: 1px;
+    font-weight: bold;
+}
+
+#statusMsg {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 30px;
+    padding: 6px 18px;
+    font-size: 13px;
+    font-family: monospace;
+    border: 1px solid #ffaa66;
+    z-index: 10;
+    pointer-events: none;
+    white-space: nowrap;
+    backdrop-filter: blur(4px);
+    color: white;
+}
+
+@media (max-width: 600px) {
+    #shortcuts {
+        font-size: 10px;
+        bottom: 10px;
+        padding: 4px 12px;
+    }
+    #statusMsg {
+        font-size: 10px;
+        bottom: 70px;
+    }
+}
