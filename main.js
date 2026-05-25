@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // =============================================
-// 0. NO BLOQUEAMOS — agents.js ya está en el HTML antes que main.js
+// 0. SIN BLOQUEOS — main.js arranca directo
 // =============================================
-console.log('✅ main.js iniciado - agents.js debe estar cargado previamente');
+console.log('✅ main.js iniciado');
 
 // =============================================
 // 1. CONFIGURACIÓN GLOBAL
@@ -380,7 +380,7 @@ for (let i = 0; i < 12; i++) {
 }
 
 // =============================================
-// 8. VOZ Y ORQUESTADOR
+// 8. VOZ Y DEXIS (sin agentes separados)
 // =============================================
 let isSpeaking     = false;
 let listeningActive = false;
@@ -389,11 +389,6 @@ let currentRingSpeed = 0.03;
 const normalRingSpeed = 0.03;
 let lastAgentColor = null;
 let permanentColor = null;
-
-const agentColorsMap = {
-    Tejedora: 0xFFD700, Kai: 0x3399FF, 'Quántor': 0x33CC66,
-    Memoria: 0xFF3333, Valorador: 0xFF8800, Faro: 0xDDEEFF,
-};
 
 const _edgeColor = new THREE.Color();
 
@@ -423,46 +418,25 @@ function setSilenceMode() {
     currentRingSpeed = normalRingSpeed;
 }
 
+// Función principal: usa directo a window.Dexis
 async function getDexiResponse(userText) {
     const lower = userText.toLowerCase();
-
-    console.log('[Dexis] texto recibido:', userText);
-    console.log('[Dexis] window.agentes disponible:', !!window.agentes);
-    console.log('[Dexis] window.decidirAgente disponible:', !!window.decidirAgente);
 
     if (lower.includes('dexis'))
         return { respuesta: "Soy Dexis, tu asistente. ¿En qué te ayudo?", agenteNombre: 'Dexis' };
     if (lower.includes('ayuda'))
         return { respuesta: "Claro. Puedes reservar servicios de manicura, pedicura, podología, uñas de gel, faciales, o consultar por colonias árabes. ¿Qué necesitas?", agenteNombre: 'Dexis' };
 
-    if (!window.agentes || !window.decidirAgente) {
-        console.warn('[Dexis] agents.js no está cargado — respuesta de emergencia');
+    if (!window.Dexis || typeof window.Dexis.responder !== 'function') {
+        console.warn('[Dexis] window.Dexis no disponible');
         return {
-            respuesta: "Hola, soy Dexis. El sistema de agentes está cargando. Intenta de nuevo o di 'ayuda'.",
+            respuesta: "Estoy aquí. Mis sistemas están listos. ¿En qué te ayudo?",
             agenteNombre: 'Dexis'
         };
     }
 
-    const context      = window.getContextString?.() ?? '';
-    const agenteNombre = window.decidirAgente(userText, context) ?? 'Tejedora';
-    const newColor     = agentColorsMap[agenteNombre] ?? 0xFFFFFF;
-
-    console.log('[Dexis] agente seleccionado:', agenteNombre);
-
-    if (lastAgentColor !== newColor) {
-        lastAgentColor = newColor;
-        permanentColor = newColor;
-        setNucleusColor(newColor);
-    }
-
-    const agente = window.agentes[agenteNombre];
-    if (!agente) {
-        console.warn('[Dexis] agente no encontrado:', agenteNombre);
-        return { respuesta: "No encontré al agente indicado. Di 'ayuda' para ver qué puedo hacer.", agenteNombre: 'Dexis' };
-    }
-
-    const respuesta = await agente.responder(userText, context);
-    return { respuesta, agenteNombre };
+    const respuesta = await window.Dexis.responder(userText);
+    return { respuesta, agenteNombre: 'Dexis' };
 }
 
 async function processUserText(text) {
@@ -474,14 +448,14 @@ async function processUserText(text) {
 
     const statusEl = document.getElementById('statusMsg');
     if (statusEl) {
-        statusEl.innerHTML = `🤖 ${agenteNombre}: ${respuesta.substring(0, 80)}${respuesta.length > 80 ? '…' : ''}`;
+        statusEl.innerHTML = `🤖 Dexis: ${respuesta.substring(0, 80)}${respuesta.length > 80 ? '…' : ''}`;
         setTimeout(() => {
             if (listeningActive) statusEl.innerHTML = '🎤 Escuchando…';
             else statusEl.innerHTML = '⚪ Sistema listo';
         }, 5000);
     }
 
-    window.guardarConversacion?.(text, respuesta, agenteNombre);
+    window.guardarConversacion?.(text, respuesta, 'Dexis');
 }
 
 function speakResponse(text) {
