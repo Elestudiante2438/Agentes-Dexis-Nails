@@ -86,7 +86,33 @@ async function responder(mensaje) {
     return respuesta.respuesta;
 }
 
-// Exportar para main.js
+// =============================================
+// EXPORTAR PARA main.js
+// =============================================
+
+// 1. La función responder principal
 window.Dexis = { responder };
 
-console.log('🤖 Dexis orquestador listo');
+// 2. La estructura de agentes que espera main.js
+window.agentes = {
+    Tejedora: { responder: async (texto, contexto) => await responder(texto) },
+    Kai: { responder: async (texto, contexto) => await responder(texto) },
+    Quántor: { responder: async (texto, contexto) => await responder(texto) },
+    Memoria: { responder: async (texto, contexto) => await responder(texto) },
+    Valorador: { responder: async (texto, contexto) => await responder(texto) },
+    Faro: { responder: async (texto, contexto) => await responder(texto) }
+};
+
+// 3. El selector de agente que espera main.js
+window.decidirAgente = (texto, contexto) => {
+    const lower = texto.toLowerCase();
+    if (lower.includes('cita') || lower.includes('reserva') || lower.includes('agendar')) return 'Tejedora';
+    if (lower.includes('colonia') || lower.includes('perfume') || lower.includes('recomendación')) return 'Kai';
+    if (lower.includes('stock') || lower.includes('inventario') || lower.includes('reabastecer')) return 'Quántor';
+    if (lower.includes('recuerda') || lower.includes('última conversación')) return 'Memoria';
+    if (lower.includes('auditar') || lower.includes('revisar reservas')) return 'Valorador';
+    if (lower.includes('campaña') || lower.includes('marketing') || lower.includes('faro') || lower.includes('tendencias')) return 'Faro';
+    return 'Tejedora';
+};
+
+console.log('🤖 Dexis orquestador listo (con agentes exportados)');
