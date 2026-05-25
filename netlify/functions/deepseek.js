@@ -67,36 +67,62 @@ async function obtenerContextoNegocio() {
     }
 }
 
-module.exports = async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+exports.handler = async (event, context) => {
+    // CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 200,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+            },
+            body: '',
+        };
+    }
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Solo POST' });
+    if (event.httpMethod !== 'POST') {
+        return { statusCode: 405, body: JSON.stringify({ error: 'Solo POST' }) };
+    }
 
-    const { mensaje, contexto, historial } = req.body;
+    const headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json',
+    };
+
+    let mensaje, contexto, historial;
+    try {
+        const body = JSON.parse(event.body || '{}');
+        mensaje   = body.mensaje;
+        contexto  = body.contexto;
+        historial = body.historial || [];
+    } catch (e) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Body inválido' }) };
+    }
 
     if (!process.env.DEEPSEEK_API_KEY) {
-        return res.status(503).json({ 
-            respuesta: "Lo siento, estoy teniendo problemas técnicos. ¿Puedes intentar de nuevo en un momento?",
-            accion: "ninguna"
-        });
+        return {
+            statusCode: 503, headers,
+            body: JSON.stringify({
+                respuesta: "Lo siento, estoy teniendo problemas técnicos. ¿Puedes intentar de nuevo en un momento?",
+                accion: "ninguna"
+            })
+        };
     }
 
     try {
         const contextoNegocio = await obtenerContextoNegocio();
-        
-        const systemPrompt = PERSONALIDAD_DEXIS + `\n\nContexto actual del negocio:\n${JSON.stringify(contexto, null, 2)}\n\nContexto BD:\n${JSON.stringify(contextoNegocio, null, 2)}`;
-        
-        const messages = [
-            { role: 'system', content: systemPrompt }
-        ];
-        
-        if (historial && historial.length > 0) {
+
+        const systemPrompt = PERSONALIDAD_DEXIS +
+            `\n\nContexto actual del negocio:\n${JSON.stringify(contexto, null, 2)}` +
+            `\n\nContexto BD:\n${JSON.stringify(contextoNegocio, null, 2)}`;
+
+        const messages = [{ role: 'system', content: systemPrompt }];
+
+        if (historial.length > 0) {
             messages.push(...historial.map(h => ({ role: h.role, content: h.content })));
         }
-        
+
         messages.push({ role: 'user', content: mensaje });
 
         const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -107,7 +133,7 @@ module.exports = async (req, res) => {
             },
             body: JSON.stringify({
                 model: 'deepseek-chat',
-                messages: messages,
+                messages,
                 temperature: 0.8,
                 max_tokens: 500
             })
@@ -119,8 +145,8 @@ module.exports = async (req, res) => {
         }
 
         const data = await response.json();
-        let contenido = data.choices[0].message.content;
-        
+        const contenido = data.choices[0].message.content;
+
         let respuestaJSON;
         try {
             const limpio = contenido.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -128,15 +154,18 @@ module.exports = async (req, res) => {
         } catch (e) {
             respuestaJSON = { respuesta: contenido, accion: 'ninguna', params: {} };
         }
-        
-        res.status(200).json(respuestaJSON);
-        
+
+        return { statusCode: 200, headers, body: JSON.stringify(respuestaJSON) };
+
     } catch (error) {
         console.error('DeepSeek error:', error);
-        res.status(500).json({ 
-            respuesta: "Lo siento, tuve un problema técnico. ¿Puedes repetirlo?",
-            accion: "ninguna",
-            params: {}
-        });
+        return {
+            statusCode: 500, headers,
+            body: JSON.stringify({
+                respuesta: "Lo siento, tuve un problema técnico. ¿Puedes repetirlo?",
+                accion: "ninguna",
+                params: {}
+            })
+        };
     }
 };
