@@ -43,9 +43,7 @@ body {
     color: white;
 }
 
-/* ============================================= */
-/* BOTONES TÁCTILES PARA MÓVIL */
-/* ============================================= */
+/* BOTONES TÁCTILES */
 #mobile-buttons {
     position: fixed;
     bottom: 80px;
@@ -78,7 +76,6 @@ body {
     background: #6c5ce7;
 }
 
-/* En PC, ocultar los botones (solo se ven en móvil) */
 @media (min-width: 769px) {
     #mobile-buttons {
         display: none;

@@ -2,6 +2,28 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // =============================================
+// ESPERAR A QUE agents.js CARGUE
+// =============================================
+await new Promise((resolve) => {
+    if (window.agentes && window.decidirAgente) {
+        resolve();
+    } else {
+        const checkInterval = setInterval(() => {
+            if (window.agentes && window.decidirAgente) {
+                clearInterval(checkInterval);
+                resolve();
+            }
+        }, 50);
+        setTimeout(() => {
+            clearInterval(checkInterval);
+            console.warn('Timeout esperando agents.js');
+            resolve();
+        }, 5000);
+    }
+});
+console.log('✅ agents.js cargado correctamente');
+
+// =============================================
 // 1. CONFIGURACIÓN GLOBAL
 // =============================================
 const scene = new THREE.Scene();
@@ -13,18 +35,18 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // cap a 2x, evita 3x en OLED
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping  = true;
-controls.dampingFactor  = 0.05;
-controls.autoRotate     = false;
-controls.enableZoom     = true;
-controls.zoomSpeed      = 0.8;
-controls.enablePan      = true;
-controls.panSpeed       = 0.5;
-controls.maxPolarAngle  = Math.PI * 0.72; // FIX: evita orbitar boca abajo
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.autoRotate = false;
+controls.enableZoom = true;
+controls.zoomSpeed = 0.8;
+controls.enablePan = true;
+controls.panSpeed = 0.5;
+controls.maxPolarAngle = Math.PI * 0.72;
 controls.target.set(0, 0.5, 0);
 
 const sceneRadius = 7.5;
@@ -49,7 +71,6 @@ window.addEventListener('resize', () => {
     setTopView();
 });
 
-// Pausar loop cuando la pestaña está oculta
 let isPageVisible = true;
 document.addEventListener('visibilitychange', () => { isPageVisible = !document.hidden; });
 
@@ -72,8 +93,6 @@ const rimLight = new THREE.PointLight(0xff8833, 1.0, 15);
 rimLight.position.set(-1, 1, -3);
 scene.add(rimLight);
 
-scene.add(new THREE.PointLight(0xffffff, 0.5, 12).position.set(0, 6, 0) && new THREE.PointLight(0xffffff, 0.5, 12));
-// (forma simple — mejor explícita:)
 const topLight = new THREE.PointLight(0xffffff, 0.5, 12);
 topLight.position.set(0, 6, 0);
 scene.add(topLight);
@@ -83,8 +102,6 @@ scene.add(new THREE.HemisphereLight(0x0a0a2a, 0x000000, 0.6));
 // =============================================
 // 3. CENTRO — NÚCLEO EN CAPAS + DODECAEDRO + ANILLOS
 // =============================================
-
-// Burbuja exterior
 const bubbleGeo = new THREE.SphereGeometry(5.5, 64, 64);
 const bubbleMat = new THREE.MeshStandardMaterial({
     color: 0x000000, emissive: 0x000000,
@@ -96,7 +113,6 @@ const bubble = new THREE.Mesh(bubbleGeo, bubbleMat);
 bubble.position.set(0, 0.5, 0);
 scene.add(bubble);
 
-// Núcleo sólido (esfera interior brillante)
 const coreMat = new THREE.MeshStandardMaterial({
     color: 0x44cc88, emissive: 0x22aa55, emissiveIntensity: 1.2,
     metalness: 1.0, roughness: 0.0,
@@ -106,7 +122,6 @@ core.position.set(0, 0.5, 0);
 core.castShadow = true;
 scene.add(core);
 
-// Shell de glow (capa translúcida exterior al núcleo)
 const glowMat = new THREE.MeshStandardMaterial({
     color: 0x88ffcc, emissive: 0x44ddaa, emissiveIntensity: 0.4,
     metalness: 0.6, roughness: 0.3,
@@ -116,7 +131,6 @@ const glowShell = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), glowMat
 glowShell.position.copy(core.position);
 scene.add(glowShell);
 
-// Dodecaedro
 const dodecaGeo = new THREE.DodecahedronGeometry(1.05, 0);
 const dodecaMat = new THREE.MeshStandardMaterial({
     color: 0x88aaff, emissive: 0x112244, emissiveIntensity: 0.6,
@@ -130,14 +144,12 @@ scene.add(dodecahedron);
 const edgesMat = new THREE.LineBasicMaterial({ color: 0xaaddff, transparent: true, opacity: 0.9 });
 dodecahedron.add(new THREE.LineSegments(new THREE.EdgesGeometry(dodecaGeo), edgesMat));
 
-// Vértices — geometría compartida
 const vertexSphereGeo = new THREE.SphereGeometry(0.05, 16, 16);
 const vertexMat = new THREE.MeshStandardMaterial({
     color: 0xffaa88, emissive: 0x884422, emissiveIntensity: 0.8, metalness: 0.9,
 });
-const puntas = [];
-const posAttr = dodecaGeo.attributes.position;
 const vertexMap = new Map();
+const posAttr = dodecaGeo.attributes.position;
 for (let i = 0; i < posAttr.count; i++) {
     const x = posAttr.getX(i), y = posAttr.getY(i), z = posAttr.getZ(i);
     const key = `${Math.round(x*1000)},${Math.round(y*1000)},${Math.round(z*1000)}`;
@@ -147,10 +159,8 @@ Array.from(vertexMap.values()).forEach(v => {
     const p = new THREE.Mesh(vertexSphereGeo, vertexMat);
     p.position.copy(v);
     dodecahedron.add(p);
-    puntas.push(p);
 });
 
-// 3 anillos (antes 2) con más variedad de ejes y velocidades
 function makeRing(radius, tube, color, emissive, rotX, rotZ) {
     const mat = new THREE.MeshStandardMaterial({
         color, emissive, emissiveIntensity: 0.8,
@@ -207,10 +217,8 @@ const starsBg = new THREE.Points(starGeo, new THREE.PointsMaterial({
 scene.add(starsBg);
 
 // =============================================
-// 6. PLANETAS — TEXTURAS PROCEDURALES + ATMÓSFERAS + LUNAS
+// 6. PLANETAS
 // =============================================
-
-// Generador de textura procedural con FBM noise
 function makePlanetTexture(size, opts = {}) {
     const {
         baseColor = [0.2, 0.5, 0.8], darkColor = [0.05, 0.1, 0.3],
@@ -224,7 +232,6 @@ function makePlanetTexture(size, opts = {}) {
     const ctx = canvas.getContext('2d');
     const w = size, h = size;
 
-    // Fondo base con gradiente
     const grad = ctx.createLinearGradient(0, 0, w, h);
     grad.addColorStop(0,   `rgb(${c(darkColor[0])},${c(darkColor[1])},${c(darkColor[2])})`);
     grad.addColorStop(0.5, `rgb(${c(baseColor[0])},${c(baseColor[1])},${c(baseColor[2])})`);
@@ -232,7 +239,6 @@ function makePlanetTexture(size, opts = {}) {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
-    // Detalle superficial con FBM
     for (let y = 0; y < h; y += 2) {
         for (let x = 0; x < w; x += 2) {
             const n = fbm((x / w) * noiseScale, (y / h) * noiseScale, 5);
@@ -247,7 +253,6 @@ function makePlanetTexture(size, opts = {}) {
         }
     }
 
-    // Nubes
     if (cloudy) {
         for (let y = 0; y < h; y += 2) {
             for (let x = 0; x < w; x += 2) {
@@ -261,7 +266,6 @@ function makePlanetTexture(size, opts = {}) {
         }
     }
 
-    // Casquetes polares
     if (poles) {
         const poleH = Math.floor(h * 0.12);
         for (let yy = 0; yy < poleH; yy++) {
@@ -293,49 +297,20 @@ function valueNoise(x, y) {
     return lerp(lerp(h(ix,iy), h(ix+1,iy), ux), lerp(h(ix,iy+1), h(ix+1,iy+1), ux), uy);
 }
 
-// Definición de planetas con sus texturas únicas
 const planetas = [
-    {
-        name: 'Tejedora', color: 0xFFD700, size: 0.45, distance: 3.0, speed: 0.005,
-        rings: true, moon: { size: 0.09, dist: 0.75, speed: 0.03 },
-        atmoColor: 0xffdd66,
-        tex: { baseColor:[1,0.75,0], darkColor:[0.5,0.3,0], noiseScale:5, cloudy:true, cloudColor:[1,0.95,0.7], hasContinents:false },
-    },
-    {
-        name: 'Kai', color: 0x3399FF, size: 0.42, distance: 3.0, speed: 0.005,
-        rings: false, moon: null, atmoColor: 0x5599ff,
-        tex: { baseColor:[0.1,0.35,0.85], darkColor:[0.02,0.1,0.45], noiseScale:4, poles:true, cloudy:true, hasContinents:true },
-    },
-    {
-        name: 'Quántor', color: 0x33CC66, size: 0.44, distance: 3.0, speed: 0.005,
-        rings: false, moon: { size: 0.07, dist: 0.7, speed: 0.025 }, atmoColor: 0x44ee88,
-        tex: { baseColor:[0.1,0.7,0.3], darkColor:[0.02,0.25,0.08], noiseScale:3.5, hasContinents:true },
-    },
-    {
-        name: 'Memoria', color: 0xFF3333, size: 0.40, distance: 3.0, speed: 0.005,
-        rings: false, moon: null, atmoColor: 0xff5533,
-        tex: { baseColor:[0.85,0.15,0.1], darkColor:[0.3,0.02,0.02], noiseScale:4, lava:true, hasContinents:false },
-    },
-    {
-        name: 'Valorador', color: 0xFF8800, size: 0.46, distance: 3.0, speed: 0.005,
-        rings: false, moon: { size: 0.08, dist: 0.8, speed: 0.02 }, atmoColor: 0xff9944,
-        tex: { baseColor:[0.95,0.45,0], darkColor:[0.4,0.15,0], noiseScale:6, cloudy:true, cloudColor:[1,0.8,0.5], hasContinents:false },
-    },
-    {
-        name: 'Faro', color: 0xDDEEFF, size: 0.38, distance: 3.0, speed: 0.005,
-        rings: false, moon: null, atmoColor: 0xaaccff,
-        tex: { baseColor:[0.75,0.85,1], darkColor:[0.3,0.4,0.6], noiseScale:3, poles:true, poleColor:[1,1,1], cloudy:true, cloudColor:[0.95,0.98,1], hasContinents:true },
-    },
+    { name: 'Tejedora', color: 0xFFD700, size: 0.45, distance: 3.0, speed: 0.005, rings: true, moon: { size: 0.09, dist: 0.75, speed: 0.03 }, atmoColor: 0xffdd66, tex: { baseColor:[1,0.75,0], darkColor:[0.5,0.3,0], noiseScale:5, cloudy:true, cloudColor:[1,0.95,0.7], hasContinents:false } },
+    { name: 'Kai', color: 0x3399FF, size: 0.42, distance: 3.0, speed: 0.005, rings: false, moon: null, atmoColor: 0x5599ff, tex: { baseColor:[0.1,0.35,0.85], darkColor:[0.02,0.1,0.45], noiseScale:4, poles:true, cloudy:true, hasContinents:true } },
+    { name: 'Quántor', color: 0x33CC66, size: 0.44, distance: 3.0, speed: 0.005, rings: false, moon: { size: 0.07, dist: 0.7, speed: 0.025 }, atmoColor: 0x44ee88, tex: { baseColor:[0.1,0.7,0.3], darkColor:[0.02,0.25,0.08], noiseScale:3.5, hasContinents:true } },
+    { name: 'Memoria', color: 0xFF3333, size: 0.40, distance: 3.0, speed: 0.005, rings: false, moon: null, atmoColor: 0xff5533, tex: { baseColor:[0.85,0.15,0.1], darkColor:[0.3,0.02,0.02], noiseScale:4, lava:true, hasContinents:false } },
+    { name: 'Valorador', color: 0xFF8800, size: 0.46, distance: 3.0, speed: 0.005, rings: false, moon: { size: 0.08, dist: 0.8, speed: 0.02 }, atmoColor: 0xff9944, tex: { baseColor:[0.95,0.45,0], darkColor:[0.4,0.15,0], noiseScale:6, cloudy:true, cloudColor:[1,0.8,0.5], hasContinents:false } },
+    { name: 'Faro', color: 0xDDEEFF, size: 0.38, distance: 3.0, speed: 0.005, rings: false, moon: null, atmoColor: 0xaaccff, tex: { baseColor:[0.75,0.85,1], darkColor:[0.3,0.4,0.6], noiseScale:3, poles:true, poleColor:[1,1,1], cloudy:true, cloudColor:[0.95,0.98,1], hasContinents:true } },
 ];
 
 const anglesPlanets = [0, 60, 120, 180, 240, 300].map(d => d * Math.PI / 180);
 const planetFigures = [];
-
-// Guías de órbita (círculos sutiles)
 const orbitMat = new THREE.LineBasicMaterial({ color: 0x223355, transparent: true, opacity: 0.2 });
 
 planetas.forEach((def, idx) => {
-    // Órbita visual
     const oPts = [];
     for (let i = 0; i <= 128; i++) {
         const a = (i / 128) * Math.PI * 2;
@@ -343,57 +318,36 @@ planetas.forEach((def, idx) => {
     }
     scene.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(oPts), orbitMat));
 
-    // Textura procedural
     const tex = makePlanetTexture(512, def.tex);
-
-    // Planeta
     const planet = new THREE.Mesh(
         new THREE.SphereGeometry(def.size, 64, 64),
-        new THREE.MeshStandardMaterial({
-            map: tex, metalness: 0.1, roughness: 0.8,
-            emissive: new THREE.Color(def.color), emissiveIntensity: 0.04,
-        })
+        new THREE.MeshStandardMaterial({ map: tex, metalness: 0.1, roughness: 0.8, emissive: new THREE.Color(def.color), emissiveIntensity: 0.04 })
     );
     planet.castShadow = true;
     planet.receiveShadow = true;
-
     const initAngle = anglesPlanets[idx];
     planet.position.set(Math.cos(initAngle) * def.distance, 0.5, Math.sin(initAngle) * def.distance);
     planet.userData = { name: def.name, color: def.color, distance: def.distance, speed: def.speed, angle: initAngle };
     scene.add(planet);
     planetFigures.push(planet);
 
-    // Atmósfera (shell semitransparente con glow)
     const atmo = new THREE.Mesh(
         new THREE.SphereGeometry(def.size * 1.12, 32, 32),
-        new THREE.MeshStandardMaterial({
-            color: def.atmoColor, emissive: def.atmoColor, emissiveIntensity: 0.2,
-            transparent: true, opacity: 0.15, side: THREE.BackSide,
-            depthWrite: false, blending: THREE.AdditiveBlending,
-        })
+        new THREE.MeshStandardMaterial({ color: def.atmoColor, emissive: def.atmoColor, emissiveIntensity: 0.2, transparent: true, opacity: 0.15, side: THREE.BackSide, depthWrite: false, blending: THREE.AdditiveBlending })
     );
     planet.add(atmo);
 
-    // Anillos tipo Saturno (Tejedora)
     if (def.rings) {
         const rMesh = new THREE.Mesh(
             new THREE.TorusGeometry(def.size * 1.7, def.size * 0.4, 2, 120),
-            new THREE.MeshStandardMaterial({
-                color: 0xffcc77, emissive: 0x553300, emissiveIntensity: 0.3,
-                metalness: 0.4, roughness: 0.7, transparent: true, opacity: 0.6,
-                side: THREE.DoubleSide,
-            })
+            new THREE.MeshStandardMaterial({ color: 0xffcc77, emissive: 0x553300, emissiveIntensity: 0.3, metalness: 0.4, roughness: 0.7, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
         );
         rMesh.rotation.x = Math.PI / 2;
         planet.add(rMesh);
     }
 
-    // Luna
     if (def.moon) {
-        const moonTex = makePlanetTexture(128, {
-            baseColor: [0.55, 0.55, 0.55], darkColor: [0.2, 0.2, 0.22],
-            noiseScale: 5, hasContinents: true,
-        });
+        const moonTex = makePlanetTexture(128, { baseColor: [0.55, 0.55, 0.55], darkColor: [0.2, 0.2, 0.22], noiseScale: 5, hasContinents: true });
         const moon = new THREE.Mesh(
             new THREE.SphereGeometry(def.moon.size, 16, 16),
             new THREE.MeshStandardMaterial({ map: moonTex, roughness: 0.95, metalness: 0.05 })
@@ -408,8 +362,6 @@ planetas.forEach((def, idx) => {
 // 7. NAVES
 // =============================================
 const ships = [];
-
-// Materiales compartidos (no instanciar por nave)
 const _wingMat   = new THREE.MeshStandardMaterial({ color: 0xccccdd, metalness: 0.95, roughness: 0.1 });
 const _exhaustMat = new THREE.MeshStandardMaterial({ color: 0xaa8866, emissive: 0x221100, emissiveIntensity: 0.3 });
 const _wingGeo   = new THREE.BoxGeometry(0.08, 0.015, 0.04);
@@ -453,16 +405,13 @@ let recognition    = null;
 let currentRingSpeed = 0.03;
 const normalRingSpeed = 0.03;
 let lastAgentColor = null;
-let permanentColor = null; // antes window._permanentColor — ahora variable local
+let permanentColor = null;
 
 const agentColorsMap = {
     Tejedora: 0xFFD700, Kai: 0x3399FF, 'Quántor': 0x33CC66,
     Memoria: 0xFF3333, Valorador: 0xFF8800, Faro: 0xDDEEFF,
 };
 
-// statusMsg visible para feedback al usuario
-
-// Color reusable para el titileo (evita new THREE.Color() en cada frame)
 const _edgeColor = new THREE.Color();
 
 function setNucleusColor(hex) {
@@ -494,7 +443,6 @@ function setSilenceMode() {
 async function getDexiResponse(userText) {
     const lower = userText.toLowerCase();
 
-    // Diagnóstico: confirma que se recibió texto
     console.log('[Dexis] texto recibido:', userText);
     console.log('[Dexis] window.agentes disponible:', !!window.agentes);
     console.log('[Dexis] window.decidirAgente disponible:', !!window.decidirAgente);
@@ -504,7 +452,6 @@ async function getDexiResponse(userText) {
     if (lower.includes('ayuda'))
         return { respuesta: "Claro. Puedes reservar servicios de manicura, pedicura, podología, uñas de gel, faciales, o consultar por colonias árabes. ¿Qué necesitas?", agenteNombre: 'Dexis' };
 
-    // Si agents.js no se cargó aún, respuesta de emergencia informativa
     if (!window.agentes || !window.decidirAgente) {
         console.warn('[Dexis] agents.js no está cargado — respuesta de emergencia');
         return {
@@ -542,7 +489,6 @@ async function processUserText(text) {
     window.addToMemory?.('dexi', respuesta);
     speakResponse(respuesta);
 
-    // Mostrar en statusMsg qué agente respondió
     const statusEl = document.getElementById('statusMsg');
     if (statusEl) {
         statusEl.innerHTML = `🤖 ${agenteNombre}: ${respuesta.substring(0, 80)}${respuesta.length > 80 ? '…' : ''}`;
@@ -575,8 +521,6 @@ async function startListening() {
         return;
     }
 
-    // Pedir permiso del micrófono explícitamente antes de empezar
-    // Esto hace que el navegador muestre el diálogo si no hay permiso aún
     try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
@@ -599,10 +543,8 @@ async function startListening() {
     };
 
     recognition.onend = () => {
-        // En móvil la API corta el recognition automáticamente entre frases.
-        // Si el usuario todavía tiene el dedo presionado (isPressing), reiniciar.
         if (listeningActive && typeof isPressing !== 'undefined' && isPressing) {
-            try { recognition.start(); } catch(e) { /* ya está iniciando */ }
+            try { recognition.start(); } catch(e) { }
         } else if (listeningActive) {
             stopListening();
         }
@@ -610,10 +552,7 @@ async function startListening() {
 
     recognition.onerror = (event) => {
         console.warn('[Dexis] Error de reconocimiento:', event.error);
-        // 'aborted' ocurre al detener manualmente — no es un error real
-        // 'no-speech' ocurre cuando no se detecta voz — no matar, solo loggear
         if (event.error === 'aborted' || event.error === 'no-speech') return;
-        // Para cualquier otro error sí detenemos
         stopListening();
     };
 
@@ -636,7 +575,7 @@ async function startListening() {
 }
 
 function stopListening() {
-    try { recognition?.stop(); } catch(e) { /* ignorar si ya estaba parado */ }
+    try { recognition?.stop(); } catch(e) { }
     recognition = null;
     listeningActive = false;
     const statusEl = document.getElementById('statusMsg');
@@ -661,17 +600,15 @@ let ringSwitchTimer = 0;
 
 function animate() {
     requestAnimationFrame(animate);
-    if (!isPageVisible) return; // pausa en pestaña oculta
+    if (!isPageVisible) return;
 
     time += 0.016;
 
-    // Latido: núcleo en dos capas
     const beat = Math.sin(time * 5) * 0.5 + Math.sin(time * 2.3) * 0.3;
     core.scale.setScalar(1 + beat * 0.05);
     glowShell.scale.setScalar(1 + beat * 0.09);
     dodecahedron.scale.setScalar(1 + beat * 0.025);
 
-    // Flotación
     dodecahedron.position.set(
         core.position.x + Math.sin(time * 0.7) * 0.015,
         core.position.y + Math.sin(time * 0.5) * 0.01,
@@ -684,7 +621,6 @@ function animate() {
     bubble.rotation.y -= 0.0008;
     bubble.rotation.x += 0.0003;
 
-    // Anillos (3 ahora)
     ringSwitchTimer += 0.016;
     if (ringSwitchTimer > 5) { ringDirection *= -1; ringSwitchTimer = 0; }
     const rs = currentRingSpeed * ringDirection;
@@ -698,7 +634,6 @@ function animate() {
     ring3.mesh.rotation.y += Math.sin(time * 1.1) * 0.02;
     ring3.mesh.scale.setScalar(1 + Math.cos(time * 0.9) * 0.06);
 
-    // Naves
     ships.forEach(ship => {
         const d = ship.userData;
         d.angle += d.orbitSpeed * 0.008;
@@ -711,7 +646,6 @@ function animate() {
         ship.rotation.x = Math.sin(d.angle * 2) * 0.18;
     });
 
-    // Planetas + lunas
     planetFigures.forEach(planet => {
         const d = planet.userData;
         d.angle += d.speed;
@@ -732,20 +666,17 @@ function animate() {
         }
     });
 
-    // Partículas multicolor (sin agente activo)
     if (!listeningActive && !isSpeaking && !permanentColor) {
         particleHue = (particleHue + 0.004) % 1;
         particleMat.color.setHSL(particleHue, 1, 0.6);
     }
 
-    // Titileo de aristas según color de agente
     if (permanentColor) {
         const t = 0.3 + Math.sin(time * 6) * 0.4;
         _edgeColor.setHex(permanentColor);
         edgesMat.color.setRGB(_edgeColor.r * t, _edgeColor.g * t, _edgeColor.b * t);
     }
 
-    // Parpadeo de estrellas
     starsBg.material.opacity = 0.4 + Math.sin(time * 2.5) * 0.28;
 
     controls.update();
@@ -757,8 +688,7 @@ animate();
 console.log('✨ Dexis — Universo 3D mejorado ✨');
 
 // =============================================
-// BOTONES TÁCTILES PARA MÓVIL
-// Push-to-Talk: mantén presionado para hablar
+// BOTONES TÁCTILES PARA MÓVIL (Push-to-Talk)
 // =============================================
 const btnListen = document.getElementById('btn-listen');
 const btnStop = document.getElementById('btn-stop');
@@ -768,11 +698,8 @@ let pressTimer = null;
 let isPressing = false;
 
 if (btnListen) {
-    // Mantener presionado = empezar a escuchar
     btnListen.addEventListener('mousedown', startPressToTalk);
     btnListen.addEventListener('touchstart', startPressToTalk);
-    
-    // Soltar = dejar de escuchar y procesar
     window.addEventListener('mouseup', stopPressToTalk);
     window.addEventListener('touchend', stopPressToTalk);
 }
@@ -781,50 +708,28 @@ function startPressToTalk(e) {
     e.preventDefault();
     if (isPressing) return;
     isPressing = true;
-
-    // Cambiar visual del botón
     btnListen.style.background = '#6c5ce7';
     btnListen.style.transform = 'scale(0.96)';
-
-    // Iniciar reconocimiento de voz (async — pide permiso si es necesario)
     startListening();
-
-    // Apagar automáticamente después de 10 segundos por si acaso
-    pressTimer = setTimeout(() => {
-        if (isPressing) stopPressToTalk();
-    }, 10000);
+    pressTimer = setTimeout(() => { if (isPressing) stopPressToTalk(); }, 10000);
 }
 
 function stopPressToTalk() {
     if (!isPressing) return;
     isPressing = false;
-    
-    // Restaurar visual del botón
     if (btnListen) {
         btnListen.style.background = '';
         btnListen.style.transform = '';
     }
-    
-    if (pressTimer) {
-        clearTimeout(pressTimer);
-        pressTimer = null;
-    }
-    
-    // Detener el reconocimiento (esto procesa lo que se dijo)
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
     stopListening();
 }
 
 if (btnStop) {
-    btnStop.addEventListener('click', () => {
-        stopPressToTalk();
-        stopListening();
-    });
+    btnStop.addEventListener('click', () => { stopPressToTalk(); stopListening(); });
 }
-
 if (btnReset) {
-    btnReset.addEventListener('click', () => {
-        setTopView();
-    });
+    btnReset.addEventListener('click', () => { setTopView(); });
 }
 
 console.log('✅ Botones push-to-talk activados');
