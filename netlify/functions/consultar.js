@@ -11,23 +11,28 @@ const pool = new Pool({
 
 const TABLAS_PERMITIDAS = ['inventario', 'servicios', 'profesionales', 'reservas', 'conversaciones'];
 
-module.exports = async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+const HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json',
+};
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'GET') return res.status(405).json({ error: 'Solo GET' });
+exports.handler = async (event) => {
+    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: HEADERS, body: '' };
+    if (event.httpMethod !== 'GET') return { statusCode: 405, headers: HEADERS, body: JSON.stringify({ error: 'Solo GET' }) };
 
-    const { tabla } = req.query;
+    const tabla = event.queryStringParameters?.tabla;
 
     if (!tabla || !TABLAS_PERMITIDAS.includes(tabla)) {
-        return res.status(400).json({ error: 'Tabla no válida', permitidas: TABLAS_PERMITIDAS });
+        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Tabla no válida', permitidas: TABLAS_PERMITIDAS }) };
     }
 
     try {
         const result = await pool.query(`SELECT * FROM ${tabla} ORDER BY id DESC LIMIT 100`);
-        res.status(200).json({ ok: true, datos: result.rows, total: result.rows.length });
+        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, datos: result.rows, total: result.rows.length }) };
     } catch (error) {
-        console.error(`[consultar] Error:`, error.message);
-        res.status(500).json({ error: 'Error al consultar', detalle: error.message });
+        console.error('[consultar] Error:', error.message);
+        return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ error: 'Error al consultar', detalle: error.message }) };
     }
 };

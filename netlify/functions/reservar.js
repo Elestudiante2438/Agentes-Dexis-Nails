@@ -9,21 +9,34 @@ const pool = new Pool({
     max: 3,
 });
 
-module.exports = async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+const HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json',
+};
 
-    if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Solo POST' });
+exports.handler = async (event) => {
+    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: HEADERS, body: '' };
+    if (event.httpMethod !== 'POST') return { statusCode: 405, headers: HEADERS, body: JSON.stringify({ error: 'Solo POST' }) };
 
-    const { profesional, servicio, fecha, horario, cliente } = req.body || {};
+    let profesional, servicio, fecha, horario, cliente;
+    try {
+        const body = JSON.parse(event.body || '{}');
+        profesional = body.profesional;
+        servicio    = body.servicio;
+        fecha       = body.fecha;
+        horario     = body.horario;
+        cliente     = body.cliente;
+    } catch (e) {
+        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Body inválido' }) };
+    }
 
     if (!profesional || !servicio || !fecha || !horario || !cliente) {
-        return res.status(400).json({
+        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({
             error: 'Faltan campos',
             requeridos: ['profesional', 'servicio', 'fecha', 'horario', 'cliente']
-        });
+        })};
     }
 
     try {
@@ -34,10 +47,10 @@ module.exports = async (req, res) => {
         );
 
         if (conflicto.rows.length > 0) {
-            return res.status(409).json({
+            return { statusCode: 409, headers: HEADERS, body: JSON.stringify({
                 error: 'Horario no disponible',
                 mensaje: `${profesional} ya tiene una cita el ${fecha} a las ${horario}`
-            });
+            })};
         }
 
         const result = await pool.query(
@@ -47,11 +60,11 @@ module.exports = async (req, res) => {
             [profesional, servicio, fecha, horario, cliente]
         );
 
-        console.log(`[reservar] Nueva reserva: ${cliente} → ${servicio} con ${profesional} el ${fecha} ${horario}`);
-        res.status(201).json({ ok: true, reserva: result.rows[0] });
+        console.log(`[reservar] ${cliente} → ${servicio} con ${profesional} el ${fecha} ${horario}`);
+        return { statusCode: 201, headers: HEADERS, body: JSON.stringify({ ok: true, reserva: result.rows[0] }) };
 
     } catch (error) {
         console.error('[reservar] Error:', error.message);
-        res.status(500).json({ error: 'Error interno', detalle: error.message });
+        return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ error: 'Error interno', detalle: error.message }) };
     }
 };
