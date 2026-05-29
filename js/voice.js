@@ -1,4 +1,4 @@
-import { setListeningMode, setSpeakingMode, setSilenceMode } from './nucleus.js';
+import { setListeningMode, setSpeakingMode, setSilenceMode, setListeningActive } from './nucleus.js';
 import { setNeuralIntensity } from './neural.js';
 
 // =============================================
@@ -36,6 +36,7 @@ export async function startListening() {
 
     recognition.onstart = () => {
         listeningActive = true;
+        setListeningActive(true);
         const statusEl = document.getElementById('statusMsg');
         if (statusEl) statusEl.innerHTML = '🎤 Escuchando…';
         setListeningMode();
@@ -44,7 +45,6 @@ export async function startListening() {
 
     recognition.onend = () => {
         if (listeningActive) {
-            // No detener automáticamente, esperar a que el usuario toque "Silenciar"
             console.log('[Dexis] Reconocimiento terminado pero sigue activo');
         }
     };
@@ -96,6 +96,7 @@ export function stopListening() {
         recognition = null;
     }
     listeningActive = false;
+    setListeningActive(false);
     const statusEl = document.getElementById('statusMsg');
     if (statusEl) statusEl.innerHTML = '⚪ Sistema listo';
     setSilenceMode();

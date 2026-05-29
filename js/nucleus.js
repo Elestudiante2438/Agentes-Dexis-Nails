@@ -102,3 +102,53 @@ export const particleMat = new THREE.PointsMaterial({
     blending: THREE.AdditiveBlending, depthWrite: false,
 });
 dodecahedron.add(new THREE.Points(particleGeo, particleMat));
+
+// =============================================
+// MODOS DE VOZ PARA NÚCLEO (usados por voice.js)
+// =============================================
+let currentRingSpeed = 0.03;
+let listeningActiveGlobal = false;
+
+export function setListeningMode() {
+    bubbleMat.emissive.setHex(0x3399FF);
+    bubbleMat.emissiveIntensity = 0.8;
+    bubbleMat.color.setHex(0x3399FF);
+    if (ring1?.mat) ring1.mat.emissiveIntensity = 1.2;
+    if (ring2?.mat) ring2.mat.emissiveIntensity = 1.2;
+    if (ring3?.mat) ring3.mat.emissiveIntensity = 1.0;
+    currentRingSpeed = 0.03;
+}
+
+export function setSpeakingMode() {
+    bubbleMat.emissive.setHex(0xFFAA44);
+    bubbleMat.emissiveIntensity = 1.0;
+    bubbleMat.color.setHex(0xFFAA44);
+    if (ring1?.mat) ring1.mat.emissiveIntensity = 1.6;
+    if (ring2?.mat) ring2.mat.emissiveIntensity = 1.6;
+    if (ring3?.mat) ring3.mat.emissiveIntensity = 1.4;
+    currentRingSpeed = 0.03 * 1.8;
+    setTimeout(() => {
+        if (listeningActiveGlobal) setListeningMode();
+        else setSilenceMode();
+    }, 1200);
+}
+
+export function setSilenceMode() {
+    bubbleMat.emissive.setHex(0x000000);
+    bubbleMat.emissiveIntensity = 0.0;
+    bubbleMat.color.setHex(0x000000);
+    if (ring1?.mat) ring1.mat.emissiveIntensity = 0.7;
+    if (ring2?.mat) ring2.mat.emissiveIntensity = 0.7;
+    if (ring3?.mat) ring3.mat.emissiveIntensity = 0.7;
+    currentRingSpeed = 0.03;
+}
+
+// Función para actualizar estado desde voice.js
+export function setListeningActive(active) {
+    listeningActiveGlobal = active;
+}
+
+// Exportar currentRingSpeed para animación
+export function getCurrentRingSpeed() {
+    return currentRingSpeed;
+}
