@@ -1,22 +1,46 @@
-const { sql, checkApiKey, resp } = require('./_core');
+const { neon } = require('@neondatabase/serverless');
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'GET') return resp(405, { error: 'Method not allowed' });
-  if (!checkApiKey(event)) return resp(401, { error: 'No autorizado' });
+    const sql = neon(process.env.DATABASE_URL);
+    const { tabla } = event.queryStringParameters || {};
 
-  const tabla = event.queryStringParameters?.tabla;
-  const tablasPermitidas = ['servicios', 'inventario', 'profesionales', 'reservas', 'appointments'];
+    const tablasPermitidas = ['servicios', 'inventario', 'profesionales', 'reservas', 'appointments'];
 
-  if (!tabla || !tablasPermitidas.includes(tabla)) {
-    return resp(400, { error: `Tabla no permitida. Opciones: ${tablasPermitidas.join(', ')}` });
-  }
+    if (!tablasPermitidas.includes(tabla)) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify({ error: 'Tabla no permitida' })
+        };
+    }
 
-  try {
-    // Seguro: tabla ya validada contra whitelist estricta
-    const datos = await sql.unsafe(`SELECT * FROM ${tabla} LIMIT 100`);
-    return resp(200, { datos });
-  } catch (error) {
-    console.error('❌ Error en consultar:', error.message);
-    return resp(500, { error: 'Error al consultar', datos: [] });
-  }
+    try {
+        let datos;
+        
+        // Mapeo específico para inventario (porque tiene columnas diferentes)
+        if (tabla === 'inventario') {
+            datos = await sql`
+                SELECT 
+                    nombre, 
+                    existencias as stock, 
+                    precio, 
+                    identificacion as id 
+                FROM inventario 
+                LIMIT 100
+            `;
+        } else {
+            datos = await sql`SELECT * FROM ${sql(tabla)} LIMIT 100`;
+        }
+
+        return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ datos })
+        };
+    } catch (error) {
+        console.error('❌ Error en /api/consultar:', error.message);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: error.message })
+        };
+    }
 };
