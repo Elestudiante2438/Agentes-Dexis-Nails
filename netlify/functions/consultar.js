@@ -1,38 +1,22 @@
-// =============================================
-// CONSULTAR - Tablas de Neon
-// =============================================
-const { Pool } = require('pg');
-
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-    max: 3,
-});
-
-const TABLAS_PERMITIDAS = ['inventario', 'servicios', 'profesionales', 'reservas', 'conversaciones'];
-
-const HEADERS = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json',
-};
+const { sql, checkApiKey, resp } = require('./_core');
 
 exports.handler = async (event) => {
-    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: HEADERS, body: '' };
-    if (event.httpMethod !== 'GET') return { statusCode: 405, headers: HEADERS, body: JSON.stringify({ error: 'Solo GET' }) };
+  if (event.httpMethod !== 'GET') return resp(405, { error: 'Method not allowed' });
+  if (!checkApiKey(event)) return resp(401, { error: 'No autorizado' });
 
-    const tabla = event.queryStringParameters?.tabla;
+  const tabla = event.queryStringParameters?.tabla;
+  const tablasPermitidas = ['servicios', 'inventario', 'profesionales', 'reservas', 'appointments'];
 
-    if (!tabla || !TABLAS_PERMITIDAS.includes(tabla)) {
-        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Tabla no válida', permitidas: TABLAS_PERMITIDAS }) };
-    }
+  if (!tabla || !tablasPermitidas.includes(tabla)) {
+    return resp(400, { error: `Tabla no permitida. Opciones: ${tablasPermitidas.join(', ')}` });
+  }
 
-    try {
-        const result = await pool.query(`SELECT * FROM ${tabla} ORDER BY id DESC LIMIT 100`);
-        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: true, datos: result.rows, total: result.rows.length }) };
-    } catch (error) {
-        console.error('[consultar] Error:', error.message);
-        return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ error: 'Error al consultar', detalle: error.message }) };
-    }
+  try {
+    // Seguro: tabla ya validada contra whitelist estricta
+    const datos = await sql.unsafe(`SELECT * FROM ${tabla} LIMIT 100`);
+    return resp(200, { datos });
+  } catch (error) {
+    console.error('❌ Error en consultar:', error.message);
+    return resp(500, { error: 'Error al consultar', datos: [] });
+  }
 };

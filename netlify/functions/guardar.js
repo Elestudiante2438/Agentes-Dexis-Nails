@@ -1,49 +1,24 @@
-// =============================================
-// GUARDAR - Guardar conversaciones en Neon
-// =============================================
-const { Pool } = require('pg');
-
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-    max: 2,
-});
-
-const HEADERS = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json',
-};
+const { sql, checkApiKey, resp } = require('./_core');
 
 exports.handler = async (event) => {
-    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: HEADERS, body: '' };
-    if (event.httpMethod !== 'POST') return { statusCode: 405, headers: HEADERS, body: JSON.stringify({ error: 'Solo POST' }) };
+  if (event.httpMethod !== 'POST') return resp(405, { error: 'Method not allowed' });
+  if (!checkApiKey(event)) return resp(401, { error: 'No autorizado' });
 
-    let cliente = 'Visitante', mensaje, respuesta, agente;
-    try {
-        const body = JSON.parse(event.body || '{}');
-        cliente   = body.cliente || 'Visitante';
-        mensaje   = body.mensaje;
-        respuesta = body.respuesta;
-        agente    = body.agente;
-    } catch (e) {
-        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Body inválido' }) };
-    }
+  const { mensaje, respuesta, agente } = JSON.parse(event.body || '{}');
 
-    if (!mensaje || !respuesta || !agente) {
-        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Faltan: mensaje, respuesta, agente' }) };
-    }
+  if (!mensaje || !respuesta) {
+    return resp(400, { error: 'Faltan campos: mensaje, respuesta' });
+  }
 
-    try {
-        const result = await pool.query(
-            `INSERT INTO conversaciones (cliente, mensaje, respuesta, agente, creada_en)
-             VALUES ($1, $2, $3, $4, NOW()) RETURNING id`,
-            [cliente, mensaje, respuesta, agente]
-        );
-        return { statusCode: 201, headers: HEADERS, body: JSON.stringify({ ok: true, id: result.rows[0].id }) };
-    } catch (error) {
-        console.error('[guardar] Error:', error.message);
-        return { statusCode: 200, headers: HEADERS, body: JSON.stringify({ ok: false, advertencia: 'Conversación no guardada en BD' }) };
-    }
+  try {
+    await sql`
+      INSERT INTO conversaciones (mensaje, respuesta, agente)
+      VALUES (${mensaje}, ${respuesta}, ${agente || 'Dexis'})
+    `;
+    return resp(200, { ok: true });
+  } catch (error) {
+    console.error('❌ Error guardando conversación:', error.message);
+    // No falla hard — guardar conversación es secundario
+    return resp(200, { ok: true, warning: 'No se guardó la conversación' });
+  }
 };

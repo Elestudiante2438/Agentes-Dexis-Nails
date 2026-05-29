@@ -1,70 +1,35 @@
-// =============================================
-// RESERVAR - Crear reservas con validación de conflictos
-// =============================================
-const { Pool } = require('pg');
-
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-    max: 3,
-});
-
-const HEADERS = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json',
-};
+const { sql, checkApiKey, resp } = require('./_core');
 
 exports.handler = async (event) => {
-    if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: HEADERS, body: '' };
-    if (event.httpMethod !== 'POST') return { statusCode: 405, headers: HEADERS, body: JSON.stringify({ error: 'Solo POST' }) };
+  if (event.httpMethod !== 'POST') return resp(405, { error: 'Method not allowed' });
+  if (!checkApiKey(event)) return resp(401, { error: 'No autorizado' });
 
-    let profesional, servicio, fecha, horario, cliente;
+  const { client_name, client_phone, appointment_time, servicio } = JSON.parse(event.body || '{}');
+
+  if (!client_name || !client_phone || !appointment_time) {
+    return resp(400, { error: 'Faltan datos: client_name, client_phone, appointment_time' });
+  }
+
+  try {
+    // Intentar tabla reservas primero (estructura completa con campo servicio)
+    const result = await sql`
+      INSERT INTO reservas (client_name, client_phone, appointment_time, servicio)
+      VALUES (${client_name}, ${client_phone}, ${appointment_time}, ${servicio || null})
+      RETURNING id
+    `;
+    return resp(200, { ok: true, cita_id: result[0].id });
+  } catch {
+    // Fallback a appointments si reservas no tiene columna servicio todavía
     try {
-        const body = JSON.parse(event.body || '{}');
-        profesional = body.profesional;
-        servicio    = body.servicio;
-        fecha       = body.fecha;
-        horario     = body.horario;
-        cliente     = body.cliente;
-    } catch (e) {
-        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({ error: 'Body inválido' }) };
-    }
-
-    if (!profesional || !servicio || !fecha || !horario || !cliente) {
-        return { statusCode: 400, headers: HEADERS, body: JSON.stringify({
-            error: 'Faltan campos',
-            requeridos: ['profesional', 'servicio', 'fecha', 'horario', 'cliente']
-        })};
-    }
-
-    try {
-        const conflicto = await pool.query(
-            `SELECT id FROM reservas 
-             WHERE profesional = $1 AND fecha = $2 AND horario = $3 AND estado != 'cancelada'`,
-            [profesional, fecha, horario]
-        );
-
-        if (conflicto.rows.length > 0) {
-            return { statusCode: 409, headers: HEADERS, body: JSON.stringify({
-                error: 'Horario no disponible',
-                mensaje: `${profesional} ya tiene una cita el ${fecha} a las ${horario}`
-            })};
-        }
-
-        const result = await pool.query(
-            `INSERT INTO reservas (profesional, servicio, fecha, horario, cliente, estado, creada_en)
-             VALUES ($1, $2, $3, $4, $5, 'pendiente', NOW())
-             RETURNING *`,
-            [profesional, servicio, fecha, horario, cliente]
-        );
-
-        console.log(`[reservar] ${cliente} → ${servicio} con ${profesional} el ${fecha} ${horario}`);
-        return { statusCode: 201, headers: HEADERS, body: JSON.stringify({ ok: true, reserva: result.rows[0] }) };
-
+      const result = await sql`
+        INSERT INTO appointments (client_name, client_phone, appointment_time, branch_parent_hash)
+        VALUES (${client_name}, ${client_phone}, ${appointment_time}, ${'web'})
+        RETURNING id
+      `;
+      return resp(200, { ok: true, cita_id: result[0].id });
     } catch (error) {
-        console.error('[reservar] Error:', error.message);
-        return { statusCode: 500, headers: HEADERS, body: JSON.stringify({ error: 'Error interno', detalle: error.message }) };
+      console.error('❌ Error en reservar:', error.message);
+      return resp(500, { error: 'Error al crear reserva' });
     }
+  }
 };

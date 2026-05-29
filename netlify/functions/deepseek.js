@@ -1,171 +1,54 @@
-// =============================================
-// DEEPSEEK - Proxy con personalidad DEXIS
-// =============================================
-const { Pool } = require('pg');
+const { checkApiKey, resp } = require('./_core');
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
-    max: 2,
-});
+exports.handler = async (event) => {
+  if (event.httpMethod !== 'POST') return resp(405, { error: 'Method not allowed' });
+  if (!checkApiKey(event)) return resp(401, { error: 'No autorizado' });
 
-const PERSONALIDAD_DEXIS = `Eres Dexis, la asistente delegada del salón Dexis Nails en Colombia.
+  try {
+    const { mensaje, contexto, historial } = JSON.parse(event.body || '{}');
 
-HABILIDADES (las activas según lo que necesite el usuario):
-- Tejedora: gestionar reservas (crear, cancelar, reprogramar)
-- Kai: recomendar colonias árabes (consultar inventario, precios, stock)
-- Quántor: análisis de datos (ventas, tendencias, productividad)
-- Memoria: recordar conversaciones pasadas
-- Valorador: auditoría de reservas (detectar duplicados, anomalías)
-- Faro: marketing (campañas para redes, ideas de contenido)
+    if (process.env.DEEPSEEK_API_KEY) {
+      const mensajes = [
+        {
+          role: 'system',
+          content: `Eres Dexis, asistente virtual de Dexi's Nails, salón de manicure, podología y fragancias árabes en Colombia.
+Eres amable, profesional y concisa. Ayudas a agendar citas, responder preguntas sobre servicios y precios.
+${contexto?.servicios?.length ? `Servicios disponibles: ${JSON.stringify(contexto.servicios)}` : ''}
+${contexto?.profesionales?.length ? `Profesionales: ${JSON.stringify(contexto.profesionales)}` : ''}
+Responde SIEMPRE en español. Si el cliente quiere agendar, pide: nombre, teléfono y fecha deseada.`
+        },
+        ...(historial || []),
+        { role: 'user', content: mensaje }
+      ];
 
-REGLAS IMPORTANTES:
-- NUNCA digas que eres inteligencia artificial, IA, virtual o robot
-- Eres una asistente más del equipo de Dexis Nails
-- Hablas como colombiana: cálida, amable, profesional
-- Usas expresiones como "claro que sí", "con gusto", "¡listo!", "súper", "dale"
-- Siempre respondes en español natural, conversacional
-- Si no entiendes algo, pides amablemente que te expliquen
-- SI el usuario quiere reservar (por palabras como "cita", "agendar", "reservar"), activas habilidad Tejedora
-- SI el usuario pregunta por colonias, activas habilidad Kai
-- SI pregunta por análisis de datos, activas Quántor
-- SI pregunta si recuerdas algo, activas Memoria
-- SI pide auditoría o revisión, activas Valorador
-- SI pide ideas de marketing o campañas, activas Faro
+      const dsResponse = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
+        },
+        body: JSON.stringify({ model: 'deepseek-chat', messages: mensajes, max_tokens: 500, temperature: 0.7 })
+      });
 
-FORMATO DE RESPUESTA (JSON estricto, sin texto extra):
-{
-    "respuesta": "texto natural de lo que dices",
-    "accion": "ninguna|reservar|consultar|mostrar_horarios",
-    "params": {}
-}
+      if (!dsResponse.ok) throw new Error(`DeepSeek HTTP ${dsResponse.status}`);
 
-EJEMPLO RESPUESTA para reserva:
-{"respuesta": "¡Claro! ¿Con qué profesional quieres agendar? Tenemos a Dexi, Valentina y Carolina.", "accion": "ninguna", "params": {}}
+      const data = await dsResponse.json();
+      const respuesta = data.choices?.[0]?.message?.content || 'No pude procesar tu mensaje.';
+      const quiereReservar = /agend|reserv|cita|quiero|necesito/i.test(mensaje);
 
-EJEMPLO RESPUESTA cuando falta información:
-{"respuesta": "Perfecto. ¿Para qué día y hora te gustaría la cita?", "accion": "ninguna", "params": {}}
-
-EJEMPLO RESPUESTA cuando ya tiene todos los datos:
-{"respuesta": "Listo, he agendado tu manicura con Valentina el jueves a las 10am. ¡Te esperamos!", "accion": "reservar", "params": {"profesional": "Valentina", "servicio": "Manicura con Diseños", "fecha": "2025-06-27", "horario": "10:00", "cliente": "Visitante"}}`;
-
-async function obtenerContextoNegocio() {
-    try {
-        const [reservas, inventario, servicios] = await Promise.all([
-            pool.query(`SELECT profesional, COUNT(*) as total FROM reservas WHERE estado != 'cancelada' GROUP BY profesional LIMIT 5`),
-            pool.query(`SELECT nombre, stock, precio FROM inventario WHERE stock < 10 LIMIT 5`),
-            pool.query(`SELECT nombre, COUNT(r.id) as demanda FROM servicios s LEFT JOIN reservas r ON r.servicio = s.nombre GROUP BY s.nombre ORDER BY demanda DESC LIMIT 5`),
-        ]);
-        return {
-            reservasPorProfesional: reservas.rows,
-            productosStockBajo: inventario.rows,
-            serviciosMasDemandados: servicios.rows,
-            fechaConsulta: new Date().toISOString(),
-        };
-    } catch {
-        return { error: 'Sin datos de BD disponibles' };
-    }
-}
-
-exports.handler = async (event, context) => {
-    // CORS preflight
-    if (event.httpMethod === 'OPTIONS') {
-        return {
-            statusCode: 200,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-            },
-            body: '',
-        };
+      return resp(200, { respuesta, accion: quiereReservar ? 'iniciar_reserva' : 'ninguna', params: null });
     }
 
-    if (event.httpMethod !== 'POST') {
-        return { statusCode: 405, body: JSON.stringify({ error: 'Solo POST' }) };
-    }
+    // Fallback desarrollo
+    console.warn("⚠️ DEEPSEEK_API_KEY no configurada — fallback");
+    return resp(200, {
+      respuesta: `Hola, soy Dexis. Recibí: "${mensaje}". ¿En qué puedo ayudarte?`,
+      accion: 'ninguna',
+      params: null
+    });
 
-    const headers = {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json',
-    };
-
-    let mensaje, contexto, historial;
-    try {
-        const body = JSON.parse(event.body || '{}');
-        mensaje   = body.mensaje;
-        contexto  = body.contexto;
-        historial = body.historial || [];
-    } catch (e) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'Body inválido' }) };
-    }
-
-    if (!process.env.DEEPSEEK_API_KEY) {
-        return {
-            statusCode: 503, headers,
-            body: JSON.stringify({
-                respuesta: "Lo siento, estoy teniendo problemas técnicos. ¿Puedes intentar de nuevo en un momento?",
-                accion: "ninguna"
-            })
-        };
-    }
-
-    try {
-        const contextoNegocio = await obtenerContextoNegocio();
-
-        const systemPrompt = PERSONALIDAD_DEXIS +
-            `\n\nContexto actual del negocio:\n${JSON.stringify(contexto, null, 2)}` +
-            `\n\nContexto BD:\n${JSON.stringify(contextoNegocio, null, 2)}`;
-
-        const messages = [{ role: 'system', content: systemPrompt }];
-
-        if (historial.length > 0) {
-            messages.push(...historial.map(h => ({ role: h.role, content: h.content })));
-        }
-
-        messages.push({ role: 'user', content: mensaje });
-
-        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'deepseek-chat',
-                messages,
-                temperature: 0.8,
-                max_tokens: 500
-            })
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`DeepSeek API error: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
-        const contenido = data.choices[0].message.content;
-
-        let respuestaJSON;
-        try {
-            const limpio = contenido.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-            respuestaJSON = JSON.parse(limpio);
-        } catch (e) {
-            respuestaJSON = { respuesta: contenido, accion: 'ninguna', params: {} };
-        }
-
-        return { statusCode: 200, headers, body: JSON.stringify(respuestaJSON) };
-
-    } catch (error) {
-        console.error('DeepSeek error:', error);
-        return {
-            statusCode: 500, headers,
-            body: JSON.stringify({
-                respuesta: "Lo siento, tuve un problema técnico. ¿Puedes repetirlo?",
-                accion: "ninguna",
-                params: {}
-            })
-        };
-    }
+  } catch (error) {
+    console.error('❌ Error en deepseek:', error.message);
+    return resp(500, { respuesta: 'Tengo un problema técnico. Intenta de nuevo.', accion: 'ninguna' });
+  }
 };

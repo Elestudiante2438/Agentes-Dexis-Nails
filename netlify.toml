@@ -1,13 +1,41 @@
 [build]
-  publish = "."
   functions = "netlify/functions"
 
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-
 [functions]
-  node_bundler = "zisi"
+  node_bundler = "esbuild"
+
+# Redirigir rutas /api/* a las funciones correspondientes
+[[redirects]]
+  from = "/api/tejer"
+  to = "/.netlify/functions/tejer"
+  status = 200
+
+[[redirects]]
+  from = "/api/status"
+  to = "/.netlify/functions/status"
+  status = 200
+
+[[redirects]]
+  from = "/api/cita"
+  to = "/.netlify/functions/cita"
+  status = 200
+
+[[redirects]]
+  from = "/api/deepseek"
+  to = "/.netlify/functions/deepseek"
+  status = 200
+
+[[redirects]]
+  from = "/api/consultar"
+  to = "/.netlify/functions/consultar"
+  status = 200
+
+[[redirects]]
+  from = "/api/reservar"
+  to = "/.netlify/functions/reservar"
+  status = 200
+
+[[redirects]]
+  from = "/api/guardar"
+  to = "/.netlify/functions/guardar"
+  status = 200
