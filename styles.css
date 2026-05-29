@@ -1,57 +1,82 @@
+/* ============================================
+   ESTILOS GENERALES
+   ============================================ */
 body {
     margin: 0;
     overflow: hidden;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    position: fixed;
+    width: 100%;
+    height: 100%;
 }
 
-#shortcuts {
-    position: absolute;
-    bottom: 20px;
+/* ============================================
+   CANVAS (planetas) — ocupa toda la pantalla
+   ============================================ */
+canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    position: fixed;
+    top: 0;
     left: 0;
-    right: 0;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.9);
-    background: rgba(0, 0, 0, 0.85);
-    padding: 8px 16px;
-    border-radius: 30px;
-    font-size: 14px;
-    font-family: monospace;
-    pointer-events: none;
-    z-index: 10;
-    width: fit-content;
-    margin: 0 auto;
-    backdrop-filter: blur(4px);
-    letter-spacing: 1px;
-    font-weight: bold;
+    z-index: 1;
 }
 
+/* ============================================
+   STATUS (mensaje pegado arriba)
+   ============================================ */
 #statusMsg {
-    position: absolute;
-    top: 20px;
+    position: fixed;
+    top: 10px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.75);
     border-radius: 30px;
-    padding: 6px 18px;
+    padding: 8px 18px;
     font-size: 13px;
     font-family: monospace;
     border: 1px solid #ffaa66;
-    z-index: 10;
+    z-index: 20;
     pointer-events: none;
     white-space: nowrap;
     backdrop-filter: blur(4px);
     color: white;
+    font-weight: bold;
+    text-align: center;
 }
 
-/* BOTONES TÁCTILES */
+/* ============================================
+   SHORTCUTS (solo visible en PC)
+   ============================================ */
+#shortcuts {
+    position: fixed;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: monospace;
+    color: #ccc;
+    z-index: 20;
+    pointer-events: none;
+    white-space: nowrap;
+    backdrop-filter: blur(4px);
+}
+
+/* ============================================
+   BOTONES TÁCTILES PARA MÓVIL (pegados abajo)
+   ============================================ */
 #mobile-buttons {
     position: fixed;
-    bottom: 80px;
+    bottom: 20px;
     left: 0;
     right: 0;
     display: flex;
     justify-content: center;
-    gap: 15px;
+    gap: 20px;
     z-index: 20;
     padding: 10px;
 }
@@ -61,7 +86,7 @@ body {
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.3);
     color: white;
-    padding: 12px 20px;
+    padding: 12px 24px;
     border-radius: 40px;
     font-size: 16px;
     font-weight: bold;
@@ -76,25 +101,66 @@ body {
     background: #6c5ce7;
 }
 
-@media (min-width: 769px) {
+/* ============================================
+   TOOLTIP (para PC y celular)
+   ============================================ */
+#planet-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(8px);
+    color: #ffdd99;
+    padding: 10px 16px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-family: monospace;
+    border: 1px solid #ffaa66;
+    z-index: 1000;
+    max-width: 220px;
+    white-space: normal;
+    word-wrap: break-word;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+/* ============================================
+   RESPONSIVE (ajustes solo para móvil)
+   ============================================ */
+@media (max-width: 768px) {
+    #shortcuts {
+        display: none;  /* Ocultar en móvil */
+    }
+    
+    #statusMsg {
+        font-size: 10px;
+        top: 8px;
+        padding: 5px 12px;
+        white-space: normal;
+        max-width: 80%;
+        text-align: center;
+    }
+    
+    .voice-btn {
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+    
     #mobile-buttons {
-        display: none;
+        bottom: 15px;
+        gap: 15px;
+    }
+    
+    #planet-tooltip {
+        font-size: 10px;
+        padding: 6px 12px;
+        max-width: 180px;
     }
 }
 
-@media (max-width: 768px) {
-    #shortcuts {
-        display: none;
-    }
-    #statusMsg {
-        font-size: 10px;
-        top: 10px;
-    }
+/* ============================================
+   PC: ocultar botones táctiles
+   ============================================ */
+@media (min-width: 769px) {
     #mobile-buttons {
-        bottom: 70px;
-    }
-    .voice-btn {
-        padding: 10px 16px;
-        font-size: 14px;
+        display: none;
     }
 }
