@@ -143,4 +143,10 @@ function speakResponse(text) {
     window.speechSynthesis.speak(u);
 }
 
+// =============================================
+// EXPORTACIÓN GLOBAL PARA PRUEBAS Y BOTONES
+// =============================================
+window.startListening = startListening;
+window.stopListening = stopListening;
+
 console.log('✅ Voice module loaded');
