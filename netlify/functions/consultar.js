@@ -14,12 +14,27 @@ exports.handler = async (event) => {
     }
 
     try {
-        // SELECT * genérico para todas las tablas (sin mapeos)
-        const datos = await sql`SELECT * FROM ${sql(tabla)} LIMIT 100`;
+        let datos;
+
+        if (tabla === 'inventario') {
+            datos = await sql`SELECT * FROM inventario LIMIT 100`;
+        } else if (tabla === 'servicios') {
+            datos = await sql`SELECT * FROM servicios LIMIT 100`;
+        } else if (tabla === 'profesionales') {
+            datos = await sql`SELECT * FROM profesionales LIMIT 100`;
+        } else if (tabla === 'reservas') {
+            datos = await sql`SELECT * FROM reservas LIMIT 100`;
+        } else if (tabla === 'appointments') {
+            datos = await sql`SELECT * FROM appointments LIMIT 100`;
+        } else {
+            datos = [];
+        }
 
         return {
             statusCode: 200,
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({ datos })
         };
     } catch (error) {
