@@ -1,35 +1,20 @@
-// =============================================
-// voice.js — Voz, animación principal, eventos UI
-// Secciones 8–9 + botones
-// =============================================
-
+// ============================================
+// VOICE - Voz, animación, eventos y tooltips
+// ============================================
 import * as THREE from 'three';
-import {
-    scene, camera, renderer, controls,
-    isPageVisible, setTopView,
-    core, coreMat, glowShell, dodecahedron, dodecaMat,
-    bubble, bubbleMat,
-    ring1, ring2, ring3,
-    edgesMat, vertexMat, particleMat,
-    starsBg,
-} from './scene.js';
-import { ships } from './ships.js';
+import { scene, camera, renderer, controls, core, coreMat, dodecahedron, dodecaMat, ring1, ring2, ring3, particleMat, edgesMat, vertexMat, starsBg, bubble, bubbleMat, glowShell, setTopView, isPageVisible } from './scene.js';
 import { planetFigures } from './planets.js';
-import { mostrarTooltip, ocultarTooltip } from './data.js';
+import { datosSistema, mostrarTooltip, ocultarTooltip } from './data.js';
 
-// ---- 8. VOZ Y DEXIS ----
-
-let isSpeaking      = false;
+// ============================================
+// VOZ Y DEXIS
+// ============================================
+let isSpeaking = false;
 let listeningActive = false;
-let recognition     = null;
-export let currentRingSpeed = 0.03;
+let recognition = null;
+let currentRingSpeed = 0.03;
 const normalRingSpeed = 0.03;
-let permanentColor  = null;
-
-export const agentColorsMap = {
-    Tejedora: 0xFFD700, Kai: 0x3399FF, 'Quántor': 0x33CC66,
-    Memoria: 0xFF3333, Valorador: 0xFF8800, Faro: 0xDDEEFF,
-};
+let permanentColor = null;
 
 const _edgeColor = new THREE.Color();
 
@@ -47,13 +32,15 @@ function setListeningMode() {
     ring1.mat.emissiveIntensity = 1.2; ring2.mat.emissiveIntensity = 1.2; ring3.mat.emissiveIntensity = 1.0;
     currentRingSpeed = normalRingSpeed;
 }
+
 function setSpeakingMode() {
     bubbleMat.emissive.setHex(0xFFAA44); bubbleMat.emissiveIntensity = 1.0; bubbleMat.color.setHex(0xFFAA44);
     ring1.mat.emissiveIntensity = 1.6; ring2.mat.emissiveIntensity = 1.6; ring3.mat.emissiveIntensity = 1.4;
     currentRingSpeed = normalRingSpeed * 1.8;
     setTimeout(() => { if (listeningActive) setListeningMode(); else setSilenceMode(); }, 1200);
 }
-export function setSilenceMode() {
+
+function setSilenceMode() {
     bubbleMat.emissive.setHex(0x000000); bubbleMat.emissiveIntensity = 0.0; bubbleMat.color.setHex(0x000000);
     ring1.mat.emissiveIntensity = 0.7; ring2.mat.emissiveIntensity = 0.7; ring3.mat.emissiveIntensity = 0.7;
     currentRingSpeed = normalRingSpeed;
@@ -69,7 +56,10 @@ async function getDexiResponse(userText) {
 
     if (!window.Dexis || typeof window.Dexis.responder !== 'function') {
         console.warn('[Dexis] window.Dexis no disponible');
-        return { respuesta: "Estoy aquí. Mis sistemas están listos. ¿En qué te ayudo?", agenteNombre: 'Dexis' };
+        return {
+            respuesta: "Estoy aquí. Mis sistemas están listos. ¿En qué te ayudo?",
+            agenteNombre: 'Dexis'
+        };
     }
 
     const respuesta = await window.Dexis.responder(userText);
@@ -105,7 +95,7 @@ function speakResponse(text) {
     window.speechSynthesis.speak(u);
 }
 
-export async function startListening() {
+async function startListening() {
     if (listeningActive) return;
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -115,12 +105,19 @@ export async function startListening() {
         return;
     }
 
+    // 🔥 NUEVO: Pedir permiso de micrófono de forma explícita al tocar el botón
     try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Detener el stream inmediatamente, solo para obtener el permiso
+        stream.getTracks().forEach(track => track.stop());
+        console.log('✅ Permiso de micrófono concedido');
     } catch (err) {
         const statusEl = document.getElementById('statusMsg');
-        if (statusEl) statusEl.innerHTML = '🎤 Activa el micrófono en tu navegador para continuar';
+        if (statusEl) statusEl.innerHTML = '🎤 Necesitas permitir el micrófono para usar la voz';
         console.warn('[Dexis] Permiso de micrófono denegado:', err.message);
+        
+        // Mostrar un mensaje más claro para el celular
+        alert('📱 Para usar la voz en el celular:\n\n1. Toca el candado 🔒 en la barra de direcciones\n2. Busca "Micrófono" y cámbialo a "Permitir"\n3. Recarga la página y vuelve a intentar');
         return;
     }
 
@@ -147,7 +144,13 @@ export async function startListening() {
     recognition.onerror = (event) => {
         console.warn('[Dexis] Error de reconocimiento:', event.error);
         if (event.error === 'aborted' || event.error === 'no-speech') return;
-        stopListening();
+        
+        if (event.error === 'not-allowed') {
+            const statusEl = document.getElementById('statusMsg');
+            if (statusEl) statusEl.innerHTML = '🔒 Permiso denegado. Activa el micrófono en la URL 🔒';
+        } else {
+            stopListening();
+        }
     };
 
     recognition.onresult = (event) => {
@@ -168,7 +171,7 @@ export async function startListening() {
     }
 }
 
-export function stopListening() {
+function stopListening() {
     try { recognition?.stop(); } catch(e) { }
     recognition = null;
     listeningActive = false;
@@ -177,18 +180,56 @@ export function stopListening() {
     setSilenceMode();
 }
 
-// ---- Atajos de teclado ----
-window.addEventListener('keydown', (e) => {
-    const k = e.key.toLowerCase();
-    if (k === 'e') { e.preventDefault(); startListening(); }
-    else if (k === 'm') { e.preventDefault(); stopListening(); }
-    else if (k === 'r') { e.preventDefault(); setTopView(); }
-});
+// ============================================
+// BOTONES TÁCTILES
+// ============================================
+const btnListen = document.getElementById('btn-listen');
+const btnStop = document.getElementById('btn-stop');
+const btnReset = document.getElementById('btn-reset');
 
-// ---- 9. ANIMACIÓN ----
+let pressTimer = null;
+let isPressing = false;
 
+if (btnListen) {
+    btnListen.addEventListener('mousedown', startPressToTalk);
+    btnListen.addEventListener('touchstart', startPressToTalk);
+    window.addEventListener('mouseup', stopPressToTalk);
+    window.addEventListener('touchend', stopPressToTalk);
+}
+
+function startPressToTalk(e) {
+    e.preventDefault();
+    if (isPressing) return;
+    isPressing = true;
+    btnListen.style.background = '#6c5ce7';
+    btnListen.style.transform = 'scale(0.96)';
+    startListening();
+    pressTimer = setTimeout(() => { if (isPressing) stopPressToTalk(); }, 10000);
+}
+
+function stopPressToTalk() {
+    if (!isPressing) return;
+    isPressing = false;
+    if (btnListen) {
+        btnListen.style.background = '';
+        btnListen.style.transform = '';
+    }
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    stopListening();
+}
+
+if (btnStop) {
+    btnStop.addEventListener('click', () => { stopPressToTalk(); stopListening(); });
+}
+if (btnReset) {
+    btnReset.addEventListener('click', () => { setTopView(); });
+}
+
+// ============================================
+// ANIMACIÓN
+// ============================================
 let time = 0;
-let particleHue  = 0;
+let particleHue = 0;
 let ringDirection = 1;
 let ringSwitchTimer = 0;
 
@@ -198,7 +239,6 @@ export function animate() {
 
     time += 0.016;
 
-    // Pulso del núcleo
     const beat = Math.sin(time * 5) * 0.5 + Math.sin(time * 2.3) * 0.3;
     core.scale.setScalar(1 + beat * 0.05);
     glowShell.scale.setScalar(1 + beat * 0.09);
@@ -216,7 +256,6 @@ export function animate() {
     bubble.rotation.y -= 0.0008;
     bubble.rotation.x += 0.0003;
 
-    // Anillos
     ringSwitchTimer += 0.016;
     if (ringSwitchTimer > 5) { ringDirection *= -1; ringSwitchTimer = 0; }
     const rs = currentRingSpeed * ringDirection;
@@ -230,18 +269,22 @@ export function animate() {
     ring3.mesh.rotation.y += Math.sin(time * 1.1) * 0.02;
     ring3.mesh.scale.setScalar(1 + Math.cos(time * 0.9) * 0.06);
 
-    // Naves
-    ships.forEach(ship => {
-        const d = ship.userData;
-        d.angle += d.orbitSpeed * 0.008;
-        ship.position.set(
-            dodecahedron.position.x + Math.cos(d.angle) * d.orbitRadius,
-            dodecahedron.position.y + Math.sin(d.angle * d.yFreq) * d.yAmp,
-            dodecahedron.position.z + Math.sin(d.angle) * d.orbitRadius
-        );
-        ship.rotation.y = d.angle;
-        ship.rotation.x = Math.sin(d.angle * 2) * 0.18;
-    });
+    // Naves (si existen)
+    if (window.shipsArray) {
+        window.shipsArray.forEach(ship => {
+            const d = ship.userData;
+            if (d) {
+                d.angle += d.orbitSpeed * 0.008;
+                ship.position.set(
+                    dodecahedron.position.x + Math.cos(d.angle) * d.orbitRadius,
+                    dodecahedron.position.y + Math.sin(d.angle * d.yFreq) * d.yAmp,
+                    dodecahedron.position.z + Math.sin(d.angle) * d.orbitRadius
+                );
+                ship.rotation.y = d.angle;
+                ship.rotation.x = Math.sin(d.angle * 2) * 0.18;
+            }
+        });
+    }
 
     // Planetas
     planetFigures.forEach(planet => {
@@ -262,19 +305,19 @@ export function animate() {
                 Math.sin(md.angle) * md.dist
             );
         }
-        // Refresco periódico del texto del tooltip (~1% de probabilidad por frame)
+        
+        // Actualizar tooltip cada cierto tiempo
         if (Math.random() < 0.01) {
-            d.texto = d.getTexto ? d.getTexto() : `${d.name}\nDatos no disponibles`;
+            const textoActualizado = d.getTexto ? d.getTexto() : `${d.name}\nDatos no disponibles`;
+            d.texto = textoActualizado;
         }
     });
 
-    // Color de partículas en modo silencio
     if (!listeningActive && !isSpeaking && !permanentColor) {
         particleHue = (particleHue + 0.004) % 1;
         particleMat.color.setHSL(particleHue, 1, 0.6);
     }
 
-    // Pulso de color permanente en aristas
     if (permanentColor) {
         const t = 0.3 + Math.sin(time * 6) * 0.4;
         _edgeColor.setHex(permanentColor);
@@ -287,59 +330,19 @@ export function animate() {
     renderer.render(scene, camera);
 }
 
-// ---- Botones táctiles (push-to-talk) ----
-
-const btnListen = document.getElementById('btn-listen');
-const btnStop   = document.getElementById('btn-stop');
-const btnReset  = document.getElementById('btn-reset');
-
-let pressTimer = null;
-let isPressing = false;
-
-function startPressToTalk(e) {
-    e.preventDefault();
-    if (isPressing) return;
-    isPressing = true;
-    if (btnListen) {
-        btnListen.style.background  = '#6c5ce7';
-        btnListen.style.transform   = 'scale(0.96)';
-    }
-    startListening();
-    pressTimer = setTimeout(() => { if (isPressing) stopPressToTalk(); }, 10000);
-}
-
-function stopPressToTalk() {
-    if (!isPressing) return;
-    isPressing = false;
-    if (btnListen) {
-        btnListen.style.background = '';
-        btnListen.style.transform  = '';
-    }
-    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    stopListening();
-}
-
-if (btnListen) {
-    btnListen.addEventListener('mousedown', startPressToTalk);
-    btnListen.addEventListener('touchstart', startPressToTalk);
-    window.addEventListener('mouseup',   stopPressToTalk);
-    window.addEventListener('touchend',  stopPressToTalk);
-}
-if (btnStop)  btnStop.addEventListener('click',  () => { stopPressToTalk(); stopListening(); });
-if (btnReset) btnReset.addEventListener('click', () => { setTopView(); });
-
-// ---- Tooltips por raycasting ----
-
+// ============================================
+// TOOLTIPS CON RAYCASTER
+// ============================================
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 window.addEventListener('mousemove', (event) => {
-    mouse.x =  (event.clientX / renderer.domElement.clientWidth)  * 2 - 1;
+    mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
     mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
-
+    
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(planetFigures);
-
+    
     if (intersects.length > 0) {
         const planeta = intersects[0].object;
         const texto = planeta.userData.texto || `${planeta.userData.name}\nPasa el mouse para ver datos`;
@@ -349,4 +352,31 @@ window.addEventListener('mousemove', (event) => {
     }
 });
 
-console.log('✅ Botones push-to-talk y tooltips activados');
+// También soportar toque en celular
+window.addEventListener('touchstart', (event) => {
+    if (event.touches.length) {
+        const touch = event.touches[0];
+        mouse.x = (touch.clientX / renderer.domElement.clientWidth) * 2 - 1;
+        mouse.y = -(touch.clientY / renderer.domElement.clientHeight) * 2 + 1;
+        
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(planetFigures);
+        
+        if (intersects.length > 0) {
+            const planeta = intersects[0].object;
+            const texto = planeta.userData.texto || `${planeta.userData.name}\nToca para ver datos`;
+            mostrarTooltip(planeta, texto);
+            setTimeout(() => ocultarTooltip(), 3000);
+        }
+    }
+});
+
+// Atajos de teclado
+window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (k === 'e') { e.preventDefault(); startListening(); }
+    else if (k === 'm') { e.preventDefault(); stopListening(); }
+    else if (k === 'r') { e.preventDefault(); setTopView(); }
+});
+
+console.log('✅ Voice module loaded');
