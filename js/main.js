@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { scene, camera, renderer, controls, setTopView, isPageVisible } from './scene.js';
-import { bubble, core, coreMat, dodecahedron, dodecaMat, ring1, ring2, ring3, particleMat, edgesMat, vertexMat, glowShell } from './nucleus.js';
+import { bubble, core, coreMat, dodecahedron, dodecaMat, ring1, ring2, ring3, particleMat, edgesMat, vertexMat, glowShell, ringState } from './nucleus.js';
 import { neuralGroup, nodeMat, neuralLineMat, setNeuralIntensity, edgePairs, pulseStates } from './neural.js';
 import { starsBg, planetFigures, ships } from './environment.js';
-import { currentRingSpeed, startListening, stopListening } from './voice.js';
+import './voice.js';
+import './ui.js';
 
 // =============================================
 // ORQUESTADOR PRINCIPAL
@@ -35,7 +36,7 @@ function animate() {
     // Anillos
     ringSwitchTimer += 0.016;
     if (ringSwitchTimer > 5) { ringDirection *= -1; ringSwitchTimer = 0; }
-    const rs = currentRingSpeed * ringDirection;
+    const rs = ringState.speed * ringDirection;
     if (ring1?.mesh) {
         ring1.mesh.rotation.z += rs;
         ring1.mesh.rotation.x = Math.PI / 2 + Math.sin(time * 2.1) * 0.22;

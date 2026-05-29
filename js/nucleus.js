@@ -106,7 +106,8 @@ dodecahedron.add(new THREE.Points(particleGeo, particleMat));
 // =============================================
 // MODOS DE VOZ PARA NÚCLEO (usados por voice.js)
 // =============================================
-let currentRingSpeed = 0.03;
+// Objeto mutable compartido — voice.js escribe, main.js lee
+export const ringState = { speed: 0.03 };
 let listeningActiveGlobal = false;
 
 export function setListeningMode() {
@@ -116,7 +117,7 @@ export function setListeningMode() {
     if (ring1?.mat) ring1.mat.emissiveIntensity = 1.2;
     if (ring2?.mat) ring2.mat.emissiveIntensity = 1.2;
     if (ring3?.mat) ring3.mat.emissiveIntensity = 1.0;
-    currentRingSpeed = 0.03;
+    ringState.speed = 0.03;
 }
 
 export function setSpeakingMode() {
@@ -126,7 +127,7 @@ export function setSpeakingMode() {
     if (ring1?.mat) ring1.mat.emissiveIntensity = 1.6;
     if (ring2?.mat) ring2.mat.emissiveIntensity = 1.6;
     if (ring3?.mat) ring3.mat.emissiveIntensity = 1.4;
-    currentRingSpeed = 0.03 * 1.8;
+    ringState.speed = 0.03 * 1.8;
     setTimeout(() => {
         if (listeningActiveGlobal) setListeningMode();
         else setSilenceMode();
@@ -140,15 +141,10 @@ export function setSilenceMode() {
     if (ring1?.mat) ring1.mat.emissiveIntensity = 0.7;
     if (ring2?.mat) ring2.mat.emissiveIntensity = 0.7;
     if (ring3?.mat) ring3.mat.emissiveIntensity = 0.7;
-    currentRingSpeed = 0.03;
+    ringState.speed = 0.03;
 }
 
 // Función para actualizar estado desde voice.js
 export function setListeningActive(active) {
     listeningActiveGlobal = active;
-}
-
-// Exportar currentRingSpeed para animación
-export function getCurrentRingSpeed() {
-    return currentRingSpeed;
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { camera, renderer, setTopView } from './scene.js';
 import { planetFigures } from './environment.js';
+import { startListening, stopListening } from './voice.js';
 
 // =============================================
 // TOOLTIPS PARA PLANETAS
@@ -93,12 +94,7 @@ function startPressToTalk(e) {
         btnListen.style.background = '#6c5ce7'; 
         btnListen.style.transform = 'scale(0.96)'; 
     }
-    console.log('🟢 Botón presionado - Iniciando voz');
-    if (typeof window.startListening === 'function') {
-        window.startListening();
-    } else {
-        console.error('❌ window.startListening no está disponible');
-    }
+    startListening();
     pressTimer = setTimeout(() => { 
         if (isPressing) stopPressToTalk(); 
     }, 10000);
@@ -115,10 +111,7 @@ function stopPressToTalk() {
         clearTimeout(pressTimer); 
         pressTimer = null; 
     }
-    console.log('🔴 Botón liberado - Deteniendo voz');
-    if (typeof window.stopListening === 'function') {
-        window.stopListening();
-    }
+    stopListening();
 }
 
 if (btnListen) {
@@ -131,7 +124,7 @@ if (btnListen) {
 if (btnStop) {
     btnStop.addEventListener('click', () => { 
         stopPressToTalk(); 
-        if (typeof window.stopListening === 'function') window.stopListening();
+        stopListening();
     });
 }
 
@@ -144,20 +137,9 @@ if (btnReset) {
 // =============================================
 window.addEventListener('keydown', (e) => {
     const k = e.key.toLowerCase();
-    if (k === 'e') { 
-        e.preventDefault(); 
-        console.log('⌨️ Tecla E - Iniciando voz');
-        if (typeof window.startListening === 'function') window.startListening();
-    }
-    else if (k === 'm') { 
-        e.preventDefault(); 
-        console.log('⌨️ Tecla M - Deteniendo voz');
-        if (typeof window.stopListening === 'function') window.stopListening();
-    }
-    else if (k === 'r') { 
-        e.preventDefault(); 
-        setTopView(); 
-    }
+    if (k === 'e') { e.preventDefault(); startListening(); }
+    else if (k === 'm') { e.preventDefault(); stopListening(); }
+    else if (k === 'r') { e.preventDefault(); setTopView(); }
 });
 
-console.log('✅ UI module loaded - Usando window.startListening/stopListening');
+console.log('✅ UI module loaded');

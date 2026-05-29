@@ -31,15 +31,15 @@ controls.target.set(0, 0.5, 0);
 const sceneRadius = 7.5;
 export function setTopView() {
     camera.position.set(
-        window.innerWidth < 768 ? 2 : 4,
-        window.innerWidth < 768 ? 3 : 5,
-        window.innerWidth < 768 ? 5 : 7
+        window.innerWidth < 768 ? 0 : 4,
+        window.innerWidth < 768 ? 8 : 6,
+        window.innerWidth < 768 ? 13 : 9
     );
     controls.target.set(0, 0.5, 0);
     controls.update();
     const minDistance = sceneRadius / Math.tan((camera.fov * Math.PI) / 360);
-    controls.minDistance = minDistance * 0.9;
-    controls.maxDistance = 35;
+    controls.minDistance = minDistance * 0.6;
+    controls.maxDistance = 40;
 }
 setTopView();
 

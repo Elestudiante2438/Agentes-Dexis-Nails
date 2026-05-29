@@ -37,6 +37,7 @@ export async function startListening() {
 
     recognition.onstart = () => {
         listeningActive = true;
+        window.listeningActive = true;
         setListeningActive(true);
         const statusEl = document.getElementById('statusMsg');
         if (statusEl) statusEl.innerHTML = '🎤 Escuchando…';
@@ -97,6 +98,7 @@ export function stopListening() {
         recognition = null;
     }
     listeningActive = false;
+    window.listeningActive = false;
     setListeningActive(false);
     const statusEl = document.getElementById('statusMsg');
     if (statusEl) statusEl.innerHTML = '⚪ Sistema listo';
@@ -134,11 +136,12 @@ async function processUserText(text) {
 function speakResponse(text) {
     if (!text || isSpeaking) return;
     isSpeaking = true;
+    window.isSpeaking = true;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'es-CO';
     u.rate = 0.9;
-    u.onend = () => { isSpeaking = false; };
-    u.onerror = () => { isSpeaking = false; };
+    u.onend = () => { isSpeaking = false; window.isSpeaking = false; };
+    u.onerror = () => { isSpeaking = false; window.isSpeaking = false; };
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
 }
