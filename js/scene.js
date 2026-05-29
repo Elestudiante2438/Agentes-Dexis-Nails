@@ -2,14 +2,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // =============================================
-// ESCENA, CÁMARA, RENDERER, CONTROLES, LUCES
+// SCENE - Renderer, cámara, controles, luces
 // =============================================
+
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 scene.fog = new THREE.FogExp2(0x000000, 0.003);
 
 export const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-
 export const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
@@ -28,21 +28,34 @@ controls.panSpeed = 0.5;
 controls.maxPolarAngle = Math.PI * 0.72;
 controls.target.set(0, 0.5, 0);
 
-const sceneRadius = 7.5;
+export let isPageVisible = true;
+document.addEventListener('visibilitychange', () => { isPageVisible = !document.hidden; });
+
+// =============================================
+// AJUSTE DE CÁMARA (responsivo)
+// =============================================
 export function setTopView() {
-    camera.position.set(
-        window.innerWidth < 768 ? 0 : 4,
-        window.innerWidth < 768 ? 8 : 6,
-        window.innerWidth < 768 ? 13 : 9
-    );
+    const isMobile = window.innerWidth < 768;
+    
+    if (isMobile) {
+        // Cámara más alejada para ver la burbuja completa (radio 5.5)
+        camera.position.set(0, 5, 14);
+        controls.minDistance = 5;
+        controls.maxDistance = 25;
+    } else {
+        camera.position.set(4, 5, 7);
+        controls.minDistance = 3;
+        controls.maxDistance = 35;
+    }
+    
     controls.target.set(0, 0.5, 0);
     controls.update();
-    const minDistance = sceneRadius / Math.tan((camera.fov * Math.PI) / 360);
-    controls.minDistance = minDistance * 0.6;
-    controls.maxDistance = 40;
 }
+
+// Inicializar cámara
 setTopView();
 
+// Ajustar al cambiar tamaño de ventana
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
@@ -50,10 +63,9 @@ window.addEventListener('resize', () => {
     setTopView();
 });
 
-export let isPageVisible = true;
-document.addEventListener('visibilitychange', () => { isPageVisible = !document.hidden; });
-
-// --- Luces ---
+// =============================================
+// LUCES
+// =============================================
 scene.add(new THREE.AmbientLight(0x111122, 1.0));
 
 const mainLight = new THREE.DirectionalLight(0xfff5e0, 1.8);
@@ -75,3 +87,5 @@ topLight.position.set(0, 6, 0);
 scene.add(topLight);
 
 scene.add(new THREE.HemisphereLight(0x0a0a2a, 0x000000, 0.6));
+
+console.log('✅ Scene module loaded');
