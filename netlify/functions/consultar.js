@@ -14,21 +14,8 @@ exports.handler = async (event) => {
     }
 
     try {
-        let datos;
-        
-        if (tabla === 'inventario') {
-            datos = await sql`
-                SELECT 
-                    nombre, 
-                    existencias as stock, 
-                    precio, 
-                    "identificación" as id 
-                FROM inventario 
-                LIMIT 100
-            `;
-        } else {
-            datos = await sql`SELECT * FROM ${sql(tabla)} LIMIT 100`;
-        }
+        // SELECT * genérico para todas las tablas (sin mapeos)
+        const datos = await sql`SELECT * FROM ${sql(tabla)} LIMIT 100`;
 
         return {
             statusCode: 200,
