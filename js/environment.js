@@ -1,9 +1,44 @@
-// ============================================
-// PLANETS - Texturas procedurales y planetas
-// ============================================
 import * as THREE from 'three';
-import { scene, dodecahedron } from './scene.js';
-import { datosSistema } from './data.js';
+import { scene } from './scene.js';
+
+// =============================================
+// ESTRELLAS DE FONDO
+// =============================================
+const starCount = 2500;
+const starPos = new Float32Array(starCount * 3);
+for (let i = 0; i < starCount; i++) {
+    starPos[i*3]   = (Math.random() - 0.5) * 500;
+    starPos[i*3+1] = (Math.random() - 0.5) * 250;
+    starPos[i*3+2] = (Math.random() - 0.5) * 180 - 50;
+}
+const starGeo = new THREE.BufferGeometry();
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+export const starsBg = new THREE.Points(starGeo, new THREE.PointsMaterial({
+    color: 0xffffff, size: 0.08, transparent: true, opacity: 0.7,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+}));
+scene.add(starsBg);
+
+// =============================================
+// PLANETAS — textura procedural + datos API
+// =============================================
+function c(v) { return Math.min(255, Math.floor(v * 255)); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function fbm(x, y, oct) {
+    let v = 0, amp = 0.5, freq = 1;
+    for (let i = 0; i < oct; i++) {
+        v += valueNoise(x * freq, y * freq) * amp;
+        amp *= 0.5; freq *= 2.1;
+    }
+    return v;
+}
+function valueNoise(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy);
+    const h = (px, py) => { const n = Math.sin(px*127.1+py*311.7)*43758.5453; return n-Math.floor(n); };
+    return lerp(lerp(h(ix,iy), h(ix+1,iy), ux), lerp(h(ix,iy+1), h(ix+1,iy+1), ux), uy);
+}
 
 function makePlanetTexture(size, opts = {}) {
     const {
@@ -65,90 +100,84 @@ function makePlanetTexture(size, opts = {}) {
     return new THREE.CanvasTexture(canvas);
 }
 
-function c(v) { return Math.min(255, Math.floor(v * 255)); }
-function lerp(a, b, t) { return a + (b - a) * t; }
-function fbm(x, y, oct) {
-    let v = 0, amp = 0.5, freq = 1;
-    for (let i = 0; i < oct; i++) {
-        v += valueNoise(x * freq, y * freq) * amp;
-        amp *= 0.5; freq *= 2.1;
-    }
-    return v;
-}
-function valueNoise(x, y) {
-    const ix = Math.floor(x), iy = Math.floor(y);
-    const fx = x - ix, fy = y - iy;
-    const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy);
-    const h = (px, py) => { const n = Math.sin(px*127.1+py*311.7)*43758.5453; return n-Math.floor(n); };
-    return lerp(lerp(h(ix,iy), h(ix+1,iy), ux), lerp(h(ix,iy+1), h(ix+1,iy+1), ux), uy);
-}
+// --- Datos del backend ---
+export let datosInventario = null;
+export let datosEnseres = null;
 
+export async function cargarDatos() {
+    try {
+        const invResp = await fetch('/api/consultar?tabla=inventario');
+        if (invResp.ok) datosInventario = (await invResp.json()).datos;
+        const ensResp = await fetch('/api/consultar?tabla=enseres');
+        if (ensResp.ok) datosEnseres = (await ensResp.json()).datos;
+        console.log('📊 Datos cargados:', { inventario: datosInventario?.length, enseres: datosEnseres?.length });
+    } catch (e) {
+        console.warn('Error cargando datos:', e);
+    }
+}
+cargarDatos();
+
+// --- Definición de planetas ---
 const planetas = [
-    { 
-        name: 'Tejedora', color: 0xFFD700, size: 0.45, distance: 3.0, speed: 0.005, 
-        rings: true, moon: { size: 0.09, dist: 0.75, speed: 0.03 }, 
-        atmoColor: 0xffdd66, 
+    {
+        name: 'Tejedora', color: 0xFFD700, size: 0.45, distance: 3.0, speed: 0.005,
+        rings: true, moon: { size: 0.09, dist: 0.75, speed: 0.03 },
+        atmoColor: 0xffdd66,
         tex: { baseColor:[1,0.75,0], darkColor:[0.5,0.3,0], noiseScale:5, cloudy:true, cloudColor:[1,0.95,0.7], hasContinents:false },
-        getTexto: () => datosSistema.tejedora ? `📅 Tejedora\nRecordatorios hoy: ${datosSistema.tejedora.recordatorios_hoy}` : '📅 Tejedora\nCargando...'
+        getTexto: () => '📅 Tejedora\nOrganiza citas y recordatorios'
     },
-    { 
-        name: 'Kai', color: 0x3399FF, size: 0.42, distance: 3.0, speed: 0.005, 
-        rings: false, moon: null, atmoColor: 0x5599ff, 
+    {
+        name: 'Kai', color: 0x3399FF, size: 0.42, distance: 3.0, speed: 0.005,
+        rings: false, moon: null, atmoColor: 0x5599ff,
         tex: { baseColor:[0.1,0.35,0.85], darkColor:[0.02,0.1,0.45], noiseScale:4, poles:true, cloudy:true, hasContinents:true },
         getTexto: () => {
-            if (datosSistema.inventario && datosSistema.inventario.length > 0) {
-                const productos = datosSistema.inventario.slice(0, 3);
+            if (datosInventario && datosInventario.length > 0) {
+                const productos = datosInventario.slice(0, 3);
                 let texto = '🛍️ INVENTARIO (VENTAS)\n';
-                productos.forEach(p => {
-                    texto += `• ${p.nombre}: ${p.stock} uds ($${p.precio})\n`;
-                });
-                if (datosSistema.inventario.length > 3) {
-                    texto += `... y ${datosSistema.inventario.length - 3} más`;
-                }
+                productos.forEach(p => { texto += `• ${p.nombre}: ${p.stock} uds ($${p.precio})\n`; });
+                if (datosInventario.length > 3) texto += `... y ${datosInventario.length - 3} más`;
                 return texto;
             }
             return '🛍️ Kai\nInventario no disponible';
         }
     },
-    { 
-        name: 'Quántor', color: 0x33CC66, size: 0.44, distance: 3.0, speed: 0.005, 
-        rings: false, moon: { size: 0.07, dist: 0.7, speed: 0.025 }, 
-        atmoColor: 0x44ee88, 
+    {
+        name: 'Quántor', color: 0x33CC66, size: 0.44, distance: 3.0, speed: 0.005,
+        rings: false, moon: { size: 0.07, dist: 0.7, speed: 0.025 },
+        atmoColor: 0x44ee88,
         tex: { baseColor:[0.1,0.7,0.3], darkColor:[0.02,0.25,0.08], noiseScale:3.5, hasContinents:true },
-        getTexto: () => datosSistema.quantor ? `⚠️ Quántor\nAlertas activas: ${datosSistema.quantor.alertas}` : '⚠️ Quántor\nCargando...'
+        getTexto: () => '⚠️ Quántor\nAlertas y control de calidad'
     },
-    { 
-        name: 'Memoria', color: 0xFF3333, size: 0.40, distance: 3.0, speed: 0.005, 
-        rings: false, moon: null, atmoColor: 0xff5533, 
+    {
+        name: 'Memoria', color: 0xFF3333, size: 0.40, distance: 3.0, speed: 0.005,
+        rings: false, moon: null, atmoColor: 0xff5533,
         tex: { baseColor:[0.85,0.15,0.1], darkColor:[0.3,0.02,0.02], noiseScale:4, lava:true, hasContinents:false },
         getTexto: () => {
-            if (datosSistema.enseres && datosSistema.enseres.length > 0) {
-                const materiales = datosSistema.enseres.slice(0, 3);
+            if (datosEnseres && datosEnseres.length > 0) {
+                const materiales = datosEnseres.slice(0, 3);
                 let texto = '🔧 MATERIAL DE TRABAJO\n';
                 materiales.forEach(m => {
                     const alerta = m.stock <= m.stock_minimo ? ' ⚠️' : '';
                     texto += `• ${m.nombre}: ${m.stock} ${m.unidad}${alerta}\n`;
                 });
-                if (datosSistema.enseres.length > 3) {
-                    texto += `... y ${datosSistema.enseres.length - 3} más`;
-                }
+                if (datosEnseres.length > 3) texto += `... y ${datosEnseres.length - 3} más`;
                 return texto;
             }
             return '🔧 Memoria\nMaterial no disponible';
         }
     },
-    { 
-        name: 'Valorador', color: 0xFF8800, size: 0.46, distance: 3.0, speed: 0.005, 
-        rings: false, moon: { size: 0.08, dist: 0.8, speed: 0.02 }, 
-        atmoColor: 0xff9944, 
+    {
+        name: 'Valorador', color: 0xFF8800, size: 0.46, distance: 3.0, speed: 0.005,
+        rings: false, moon: { size: 0.08, dist: 0.8, speed: 0.02 },
+        atmoColor: 0xff9944,
         tex: { baseColor:[0.95,0.45,0], darkColor:[0.4,0.15,0], noiseScale:6, cloudy:true, cloudColor:[1,0.8,0.5], hasContinents:false },
-        getTexto: () => datosSistema.valorador ? `⚖️ Valorador\nEvaluaciones hoy: ${datosSistema.valorador.evaluaciones_hoy}` : '⚖️ Valorador\nCargando...'
+        getTexto: () => '⚖️ Valorador\nEvalúa reglas y validaciones'
     },
-    { 
-        name: 'Faro', color: 0xDDEEFF, size: 0.38, distance: 3.0, speed: 0.005, 
-        rings: false, moon: null, atmoColor: 0xaaccff, 
+    {
+        name: 'Faro', color: 0xDDEEFF, size: 0.38, distance: 3.0, speed: 0.005,
+        rings: false, moon: null, atmoColor: 0xaaccff,
         tex: { baseColor:[0.75,0.85,1], darkColor:[0.3,0.4,0.6], noiseScale:3, poles:true, poleColor:[1,1,1], cloudy:true, cloudColor:[0.95,0.98,1], hasContinents:true },
-        getTexto: () => datosSistema.faro ? `🔭 Faro\nSistema: ${datosSistema.faro.status || 'OK'}\nRecordatorios hoy: ${datosSistema.faro.faro?.recordatorios_hoy || 0}` : '🔭 Faro\nCargando...'
+        getTexto: () => '🔭 Faro\nMonitoreo del sistema'
     },
 ];
 
@@ -173,23 +202,14 @@ planetas.forEach((def, idx) => {
     planet.receiveShadow = true;
     const initAngle = anglesPlanets[idx];
     planet.position.set(Math.cos(initAngle) * def.distance, 0.5, Math.sin(initAngle) * def.distance);
-    planet.userData = { 
-        name: def.name, 
-        color: def.color, 
-        distance: def.distance, 
-        speed: def.speed, 
-        angle: initAngle, 
-        getTexto: def.getTexto,
-        texto: def.getTexto()
-    };
+    planet.userData = { name: def.name, color: def.color, distance: def.distance, speed: def.speed, angle: initAngle, getTexto: def.getTexto, texto: def.getTexto() };
     scene.add(planet);
     planetFigures.push(planet);
 
-    const atmo = new THREE.Mesh(
+    planet.add(new THREE.Mesh(
         new THREE.SphereGeometry(def.size * 1.12, 32, 32),
         new THREE.MeshStandardMaterial({ color: def.atmoColor, emissive: def.atmoColor, emissiveIntensity: 0.2, transparent: true, opacity: 0.15, side: THREE.BackSide, depthWrite: false, blending: THREE.AdditiveBlending })
-    );
-    planet.add(atmo);
+    ));
 
     if (def.rings) {
         const rMesh = new THREE.Mesh(
@@ -211,3 +231,41 @@ planetas.forEach((def, idx) => {
         planet.userData.moon = moon;
     }
 });
+
+// =============================================
+// NAVES
+// =============================================
+export const ships = [];
+const _wingMat    = new THREE.MeshStandardMaterial({ color: 0xccccdd, metalness: 0.95, roughness: 0.1 });
+const _exhaustMat = new THREE.MeshStandardMaterial({ color: 0xaa8866, emissive: 0x221100, emissiveIntensity: 0.3 });
+const _wingGeo    = new THREE.BoxGeometry(0.08, 0.015, 0.04);
+
+function createShip(color = 0x88aaff) {
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+        new THREE.ConeGeometry(0.06, 0.13, 8),
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.12, metalness: 0.85, roughness: 0.15 })
+    );
+    body.rotation.x = Math.PI / 2;
+    group.add(body);
+    const lWing = new THREE.Mesh(_wingGeo, _wingMat); lWing.position.set(-0.065, 0, 0.01);
+    const rWing = new THREE.Mesh(_wingGeo, _wingMat); rWing.position.set( 0.065, 0, 0.01);
+    group.add(lWing, rWing);
+    const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.04, 0.055, 6), _exhaustMat);
+    exhaust.position.z = -0.06;
+    group.add(exhaust);
+    return group;
+}
+
+for (let i = 0; i < 12; i++) {
+    const ship = createShip(new THREE.Color().setHSL(i / 12, 0.7, 0.6).getHex());
+    ship.userData = {
+        orbitRadius: 1.6 + Math.random() * 0.8,
+        orbitSpeed: -(0.3 + Math.random() * 0.4),
+        angle: (i / 12) * Math.PI * 2,
+        yAmp: 0.1 + Math.random() * 0.15,
+        yFreq: 0.5 + Math.random() * 1.0,
+    };
+    scene.add(ship);
+    ships.push(ship);
+}
