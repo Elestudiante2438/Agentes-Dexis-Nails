@@ -4,7 +4,7 @@ exports.handler = async (event) => {
     const sql = neon(process.env.DATABASE_URL);
     const { tabla } = event.queryStringParameters || {};
 
-    const tablasPermitidas = ['servicios', 'inventario', 'profesionales', 'reservas', 'appointments'];
+    const tablasPermitidas = ['servicios', 'inventario', 'profesionales', 'reservas', 'appointments', 'enseres'];
 
     if (!tablasPermitidas.includes(tabla)) {
         return {
@@ -26,15 +26,15 @@ exports.handler = async (event) => {
             datos = await sql`SELECT * FROM reservas LIMIT 100`;
         } else if (tabla === 'appointments') {
             datos = await sql`SELECT * FROM appointments LIMIT 100`;
+        } else if (tabla === 'enseres') {
+            datos = await sql`SELECT * FROM enseres LIMIT 100`;
         } else {
             datos = [];
         }
 
         return {
             statusCode: 200,
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ datos })
         };
     } catch (error) {
