@@ -3,7 +3,7 @@ import { scene, camera, renderer, controls, setTopView, isPageVisible } from './
 import { bubble, core, coreMat, dodecahedron, dodecaMat, ring1, ring2, ring3, particleMat, edgesMat, vertexMat, glowShell } from './nucleus.js';
 import { neuralGroup, nodeMat, neuralLineMat, setNeuralIntensity, edgePairs, pulseStates } from './neural.js';
 import { starsBg, planetFigures, ships } from './environment.js';
-import { animate as voiceAnimate, currentRingSpeed, startListening, stopListening } from './voice.js';
+import { currentRingSpeed, startListening, stopListening } from './voice.js';
 
 // =============================================
 // ORQUESTADOR PRINCIPAL
@@ -31,11 +31,6 @@ function animate() {
     core.rotation.y = time * 0.3;
     dodecahedron.rotation.y = time * 0.2;
     dodecahedron.rotation.x = Math.sin(time * 0.3) * 0.04;
-
-    // Burbuja
-    if (window.bubbleMat) {
-        // La animación de la burbuja ya está en nucleus.js
-    }
 
     // Anillos
     ringSwitchTimer += 0.016;
