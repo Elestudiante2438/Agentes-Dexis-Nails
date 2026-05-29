@@ -16,14 +16,13 @@ exports.handler = async (event) => {
     try {
         let datos;
         
-        // Mapeo específico para inventario (porque tiene columnas diferentes)
         if (tabla === 'inventario') {
             datos = await sql`
                 SELECT 
                     nombre, 
                     existencias as stock, 
                     precio, 
-                    identificacion as id 
+                    "identificación" as id 
                 FROM inventario 
                 LIMIT 100
             `;
