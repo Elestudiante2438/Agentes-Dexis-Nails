@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { camera, renderer, setTopView } from './scene.js';
 import { planetFigures } from './environment.js';
 import { startListening, stopListening } from './voice.js';
@@ -120,3 +121,5 @@ window.addEventListener('keydown', (e) => {
     else if (k === 'm') { e.preventDefault(); stopListening(); }
     else if (k === 'r') { e.preventDefault(); setTopView(); }
 });
+
+console.log('✅ UI module loaded');
