@@ -7,6 +7,7 @@ import { setNeuralIntensity } from './neural.js';
 let isSpeaking = false;
 let listeningActive = false;
 let recognition = null;
+export let currentRingSpeed = 0.03;
 
 export async function startListening() {
     if (listeningActive) return;
