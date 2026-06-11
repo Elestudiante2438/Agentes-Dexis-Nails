@@ -36,18 +36,21 @@ document.addEventListener('visibilitychange', () => { isPageVisible = !document.
 // =============================================
 export function setTopView() {
     const isMobile = window.innerWidth < 768;
-    
+
     if (isMobile) {
-        // Cámara más alejada para ver la burbuja completa (radio 5.5)
-        camera.position.set(0, 5, 14);
-        controls.minDistance = 5;
-        controls.maxDistance = 25;
+        // FOV 45° — para ver una esfera de radio ~5.5 completa con aire:
+        // distancia = radio / tan(FOV/2) * factor_seguridad
+        // 5.5 / tan(22.5°) * 1.35 ≈ 19.5 — redondeamos a 20
+        // y bajo para centrar verticalmente la escena (núcleo en y=0.5)
+        camera.position.set(0, 0.5, 20);
+        controls.minDistance = 8;
+        controls.maxDistance = 30;
     } else {
         camera.position.set(4, 5, 7);
         controls.minDistance = 3;
         controls.maxDistance = 35;
     }
-    
+
     controls.target.set(0, 0.5, 0);
     controls.update();
 }

@@ -6,8 +6,8 @@ import { bubble } from './nucleus.js';
 // MALLA NEURAL JARVIS — capa exterior azul
 // =============================================
 const NEURAL_NODE_COUNT   = window.innerWidth < 768 ? 80 : 130;
-const NEURAL_RADIUS       = 5.5;
-const NEURAL_CONNECT_DIST = 2.4;
+const NEURAL_RADIUS       = 4.2;
+const NEURAL_CONNECT_DIST = 2.2;
 
 export const nodePositions = [];
 
