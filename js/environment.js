@@ -34,15 +34,15 @@ function makeCircleSprite() {
 }
 const CIRCLE_SPRITE = makeCircleSprite();
 
-// Fix 5: Aplanar eje Y al nacer — efecto corredor/túnel más pronunciado
-// Los rayos se concentran lateralmente (XZ), el Y queda comprimido
+// Perspectiva de túnel: Y comprimido en mobile, moderado en desktop
 function initWarpParticle(i) {
     const r     = 2 + Math.random() * 4;
     const theta = Math.random() * Math.PI * 2;
     const phi   = Math.acos(2 * Math.random() - 1);
     const x = r * Math.sin(phi) * Math.cos(theta);
-    // Comprimir eje Y al 45% — da sensación de corredor horizontal
-    const y = r * Math.sin(phi) * Math.sin(theta) * 0.45;
+    // Mobile: 0.45 (corredor pronunciado), Desktop: 0.72 (más esférico, menos cortado)
+    const yFlatten = window.innerWidth < 768 ? 0.45 : 0.72;
+    const y = r * Math.sin(phi) * Math.sin(theta) * yFlatten;
     const z = r * Math.cos(phi);
 
     warpPos[i*3]   = x;
@@ -156,9 +156,6 @@ export function updateWarp() {
     const trailAttr = trailGeo.attributes.position;
     const colorAttr = trailGeo.attributes.color;
 
-    // Longitud del rastro proporcional a la velocidad — más rápido = rastro más largo
-    const trailLength = 0.8 + spd * 1.2;
-
     for (let i = 0; i < WARP_COUNT; i++) {
         const dx = warpDir[i*3];
         const dy = warpDir[i*3+1];
@@ -170,10 +167,12 @@ export function updateWarp() {
         warpPos[i*3+1] += dy * v;
         warpPos[i*3+2] += dz * v;
 
-        // Cola sigue a la cabeza con rezago = longitud del rastro
-        warpTrail[i*3]   = warpPos[i*3]   - dx * trailLength * warpSpeed[i];
-        warpTrail[i*3+1] = warpPos[i*3+1] - dy * trailLength * warpSpeed[i];
-        warpTrail[i*3+2] = warpPos[i*3+2] - dz * trailLength * warpSpeed[i];
+        // FIX: largo variable por partícula — las rápidas dejan rastros más largos
+        // warpSpeed[i] varía 0.6–1.4, multiplicado por velocidad de modo y factor base
+        const trailLength = (0.6 + spd * 1.4) * warpSpeed[i];
+        warpTrail[i*3]   = warpPos[i*3]   - dx * trailLength;
+        warpTrail[i*3+1] = warpPos[i*3+1] - dy * trailLength;
+        warpTrail[i*3+2] = warpPos[i*3+2] - dz * trailLength;
 
         // Distancia desde origen
         const px = warpPos[i*3], py = warpPos[i*3+1], pz = warpPos[i*3+2];

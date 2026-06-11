@@ -22,7 +22,7 @@ export const coreMat = new THREE.MeshStandardMaterial({
     color: 0x44cc88, emissive: 0x22aa55, emissiveIntensity: 1.2,
     metalness: 1.0, roughness: 0.0,
 });
-export const core = new THREE.Mesh(new THREE.SphereGeometry(0.55, 64, 64), coreMat);
+export const core = new THREE.Mesh(new THREE.SphereGeometry(0.80, 64, 64), coreMat);
 core.position.set(0, 0.5, 0);
 core.castShadow = true;
 scene.add(core);
@@ -30,14 +30,14 @@ scene.add(core);
 const glowMat = new THREE.MeshStandardMaterial({
     color: 0x88ffcc, emissive: 0x44ddaa, emissiveIntensity: 0.4,
     metalness: 0.6, roughness: 0.3,
-    transparent: true, opacity: 0.3, depthWrite: false,
+    transparent: true, opacity: 0.45, depthWrite: false,
 });
-export const glowShell = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), glowMat);
+export const glowShell = new THREE.Mesh(new THREE.SphereGeometry(1.25, 32, 32), glowMat);
 glowShell.position.copy(core.position);
 scene.add(glowShell);
 
 // --- Dodecaedro ---
-const dodecaGeo = new THREE.DodecahedronGeometry(1.05, 0);
+const dodecaGeo = new THREE.DodecahedronGeometry(1.45, 0);
 export const dodecaMat = new THREE.MeshStandardMaterial({
     color: 0x88aaff, emissive: 0x112244, emissiveIntensity: 0.6,
     metalness: 0.9, roughness: 0.2, transparent: true, opacity: 0.55,
@@ -80,9 +80,9 @@ function makeRing(radius, tube, color, emissive, rotX, rotZ) {
     dodecahedron.add(mesh);
     return { mesh, mat };
 }
-export const ring1 = makeRing(1.45, 0.022, 0xaa44ff, 0x6622bb, Math.PI / 2, 0);
-export const ring2 = makeRing(1.58, 0.016, 0xff8844, 0xcc4411, Math.PI / 3, Math.PI / 3);
-export const ring3 = makeRing(1.68, 0.012, 0x44ddff, 0x1188aa, Math.PI / 5, Math.PI * 0.7);
+export const ring1 = makeRing(1.90, 0.028, 0xaa44ff, 0x6622bb, Math.PI / 2, 0);
+export const ring2 = makeRing(2.10, 0.022, 0xff8844, 0xcc4411, Math.PI / 3, Math.PI / 3);
+export const ring3 = makeRing(2.25, 0.018, 0x44ddff, 0x1188aa, Math.PI / 5, Math.PI * 0.7);
 
 // --- Partículas del dodecaedro ---
 const particleCount = 2500;
