@@ -167,7 +167,7 @@ export function updateNeuralWave(time) {
 
         // Escala: respiración base + pulso de onda
         const breathe   = 1 + Math.sin(time * 1.2 + idx * 0.3) * 0.04;
-        const waveScale = 1 + totalIntensity * 1.4;
+        const waveScale = 1 + totalIntensity * 0.7;
         const s = breathe * waveScale;
         neuralGroup.children[idx].scale.set(s, s, s);
     });

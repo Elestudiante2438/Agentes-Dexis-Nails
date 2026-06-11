@@ -42,7 +42,7 @@ export function setTopView() {
         // distancia = radio / tan(FOV/2) * factor_seguridad
         // 5.5 / tan(22.5°) * 1.35 ≈ 19.5 — redondeamos a 20
         // y bajo para centrar verticalmente la escena (núcleo en y=0.5)
-        camera.position.set(0, 0.5, 20);
+        camera.position.set(0, 0.5, 23);
         controls.minDistance = 8;
         controls.maxDistance = 30;
     } else {
