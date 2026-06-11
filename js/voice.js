@@ -60,9 +60,9 @@ export async function startListening() {
     };
 
     recognition.onend = () => {
-        // Si sigue activo, reiniciamos (para móvil)
-        if (listeningActive) {
-            console.log('[Voice] Reconocimiento terminado pero sigue activo, reiniciando...');
+        // Solo reiniciar si sigue activo Y Dexis no está hablando
+        if (listeningActive && !isSpeaking) {
+            console.log('[Voice] Reconocimiento terminado, reiniciando...');
             try { recognition.start(); } catch(e) { console.warn(e); }
         }
     };
@@ -81,6 +81,7 @@ export async function startListening() {
         let finalText = '';
         for (let i = event.resultIndex; i < event.results.length; i++)
             if (event.results[i].isFinal) finalText += event.results[i][0].transcript + ' ';
+
         if (finalText) {
             setSpeakingMode();
             setNeuralIntensity(3.0);
@@ -94,17 +95,6 @@ export async function startListening() {
                     else statusEl.innerHTML = '⚪ Sistema listo';
                 }, 5000);
             }
-            setTimeout(() => {
-                if (listeningActive) {
-                    setListeningMode();
-                    setNeuralIntensity(2.0);
-                    setWarpListen();
-                } else {
-                    setSilenceMode();
-                    setNeuralIntensity(1.0);
-                    setWarpIdle();
-                }
-            }, 1000);
         }
     };
 
@@ -134,11 +124,43 @@ function speakResponse(text) {
     if (!text || isSpeaking) return;
     isSpeaking = true;
     window.isSpeaking = true;
+
+    // 🔧 FIX: pausar micrófono mientras Dexis habla para evitar bucle infinito
+    if (recognition) {
+        try { recognition.stop(); } catch(e) {}
+    }
+
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'es-CO';
     u.rate = 0.9;
-    u.onend = () => { isSpeaking = false; window.isSpeaking = false; };
-    u.onerror = () => { isSpeaking = false; window.isSpeaking = false; };
+
+    u.onend = () => {
+        isSpeaking = false;
+        window.isSpeaking = false;
+        setListeningMode();
+        setNeuralIntensity(2.0);
+        setWarpListen();
+        // 🔧 FIX: reanudar micrófono con delay para que el eco se disipe
+        if (listeningActive) {
+            setTimeout(() => {
+                try { recognition.start(); } catch(e) { console.warn('[Voice] No se pudo reanudar:', e); }
+            }, 500);
+        }
+    };
+
+    u.onerror = () => {
+        isSpeaking = false;
+        window.isSpeaking = false;
+        setSilenceMode();
+        setNeuralIntensity(1.0);
+        setWarpIdle();
+        if (listeningActive) {
+            setTimeout(() => {
+                try { recognition.start(); } catch(e) { console.warn('[Voice] No se pudo reanudar:', e); }
+            }, 500);
+        }
+    };
+
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(u);
 }
@@ -146,4 +168,4 @@ function speakResponse(text) {
 window.startListening = startListening;
 window.stopListening = stopListening;
 
-console.log('✅ Voice module loaded (direct fetch)');
+console.log('✅ Voice module loaded (fix bucle infinito)');
