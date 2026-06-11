@@ -23,7 +23,7 @@ export const neuralGroup = new THREE.Group();
 neuralGroup.position.copy(bubble.position);
 scene.add(neuralGroup);
 
-const NODE_SIZE = isMobile ? 0.065 : 0.065;
+const NODE_SIZE = isMobile ? 0.082 : 0.065;
 const nodeGeo   = new THREE.SphereGeometry(NODE_SIZE, 8, 8);
 
 for (let i = 0; i < NEURAL_NODE_COUNT; i++) {
@@ -39,23 +39,25 @@ for (let i = 0; i < NEURAL_NODE_COUNT; i++) {
     nodeDistances.push(pos.length());
 
     // ── Fase de color basada en posición esférica del nodo ──────────────────
-    // Combinamos phi, theta y un valor de ruido seudo-aleatorio por posición
-    // para que nodos cercanos tengan colores similares (efecto aurora/zona)
-    // pero el conjunto cubra todo el espectro HSL
+    // FIX: combinar distribución uniforme (índice dorado) con variación espacial
+    // para cubrir TODO el espectro uniformemente y que zonas cercanas tengan
+    // colores similares (efecto aurora de manchas de color, no arcoíris lineal)
     const nx = pos.x / NEURAL_RADIUS;
     const ny = pos.y / NEURAL_RADIUS;
     const nz = pos.z / NEURAL_RADIUS;
-    // Función de ruido suave basada en posición — produce 0..1
-    // Usamos combinación de senos para variación espacial continua
-    const spatialNoise =
-        (Math.sin(nx * 3.7 + ny * 2.1) * 0.5 + 0.5) * 0.4 +
-        (Math.sin(ny * 4.3 + nz * 1.8) * 0.5 + 0.5) * 0.35 +
-        (Math.sin(nz * 2.9 + nx * 3.2) * 0.5 + 0.5) * 0.25;
-    // spatialNoise ∈ [0, 1] — mapea a hue [0, 1] cubriendo todo el espectro
-    nodeHueOffset.push(spatialNoise % 1.0);
+    // Base uniforme: secuencia dorada garantiza que los N nodos cubran 0..1 sin sesgo
+    const goldenBase = (i * 0.618033988749895) % 1.0;
+    // Perturbación espacial suave: nodos cercanos se agrupan en zonas de color
+    const spatialPerturb =
+        Math.sin(nx * 2.3 + ny * 1.7) * 0.12 +
+        Math.sin(ny * 3.1 + nz * 2.0) * 0.10 +
+        Math.sin(nz * 1.9 + nx * 2.8) * 0.08;
+    // Resultado: distribución uniforme + agrupación suave por zona
+    const hueBase = ((goldenBase + spatialPerturb) % 1.0 + 1.0) % 1.0;
+    nodeHueOffset.push(hueBase);
 
     const mat = new THREE.MeshBasicMaterial({
-        color:       new THREE.Color().setHSL(spatialNoise % 1.0, 1.0, 0.60),
+        color:       new THREE.Color().setHSL(hueBase, 1.0, 0.60),
         transparent: true, opacity: 0.95, depthWrite: false,
         blending:    THREE.AdditiveBlending,
     });
@@ -98,7 +100,7 @@ edgeGeo.setAttribute('color', new THREE.BufferAttribute(edgeColorArray, 3));
 
 export const neuralLineMat = new THREE.LineBasicMaterial({
     vertexColors: true, transparent: true,
-    opacity:  isMobile ? 0.16 : 0.38,
+    opacity:  isMobile ? 0.16 : 0.28,
     blending: THREE.AdditiveBlending, depthWrite: false,
 });
 export const neuralLines = new THREE.LineSegments(edgeGeo, neuralLineMat);
@@ -117,7 +119,7 @@ export const pulseStates = edgePairs.map(() => ({
 //   pero mutando el espectro completo (aurora efecto)
 //
 // Además hay una onda de "brillo" que recorre la esfera para marcar pulsos
-const AURORA_SPEED   = 0.018;   // velocidad de rotación del espectro HSL
+const AURORA_SPEED   = 0.040;   // velocidad de rotación del espectro HSL — más perceptible
 const AURORA_SAT     = 1.0;     // saturación plena
 const AURORA_LIGHT   = 0.50;    // luminosidad base — más bajo = color más vivo
 const LINE_LIGHT     = 0.42;    // líneas más oscuras que nodos
@@ -211,7 +213,7 @@ export function updateNeuralWave(time) {
 
     // Opacidad dinámica de líneas
     const avgR   = (waveRadii[0] + waveRadii[1] + waveRadii[2]) / (3 * WAVE_MAX_R);
-    const baseOp = isMobile ? 0.14 : 0.32;
-    const peakOp = isMobile ? 0.28 : 0.55;
+    const baseOp = isMobile ? 0.14 : 0.22;
+    const peakOp = isMobile ? 0.28 : 0.42;
     neuralLineMat.opacity = baseOp + avgR * (peakOp - baseOp);
 }
