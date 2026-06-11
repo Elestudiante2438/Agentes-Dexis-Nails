@@ -6,8 +6,8 @@ import { bubble } from './nucleus.js';
 // MALLA NEURAL JARVIS — capa exterior azul
 // =============================================
 const NEURAL_NODE_COUNT   = window.innerWidth < 768 ? 80 : 130;
-const NEURAL_RADIUS       = 5.85;
-const NEURAL_CONNECT_DIST = 2.8;
+const NEURAL_RADIUS       = 5.5;
+const NEURAL_CONNECT_DIST = 2.4;
 
 export const nodePositions = [];
 
@@ -29,7 +29,7 @@ const nodeGeo = new THREE.SphereGeometry(window.innerWidth < 768 ? 0.055 : 0.045
 for (let i = 0; i < NEURAL_NODE_COUNT; i++) {
     const phi      = Math.acos(1 - 2 * (i + 0.5) / NEURAL_NODE_COUNT);
     const theta    = Math.PI * (1 + Math.sqrt(5)) * i;
-    const rJitter  = NEURAL_RADIUS + (Math.random() - 0.5) * 0.4;
+    const rJitter  = NEURAL_RADIUS + (Math.random() - 0.5) * 0.15;
     const pos = new THREE.Vector3(
         rJitter * Math.sin(phi) * Math.cos(theta),
         rJitter * Math.sin(phi) * Math.sin(theta),
