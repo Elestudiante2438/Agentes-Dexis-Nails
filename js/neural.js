@@ -128,13 +128,8 @@ export function setNeuralIntensity(v) { neuralIntensity = v; }
 // ─── setNodeHSL — usado por main.js en modo idle (sin voz activa) ─────────────
 // Aplica un color HSL a todos los nodos como base (reemplaza nodeMat.color.setHSL)
 export function setNodeHSL(h, s, l) {
-    _hslBase.setHSL(h, s, l);
-    // Solo aplica si las ondas no están dominando (intensidad baja)
-    // Se mezcla suavemente para no luchar contra updateNeuralWave
-    nodeMaterials.forEach(mat => {
-        mat.color.lerp(_hslBase, 0.04); // lerp lento: HSL cycling no pisará las ondas
-        mat.emissive.lerp(_hslBase, 0.03);
-    });
+    // No-op: las ondas de updateNeuralWave manejan el color de los nodos
+    // El HSL cycling de main.js queda desactivado para nodos
 }
 
 // ─── updateNeuralWave — llamar en el loop de animación ───────────────────────
@@ -167,7 +162,7 @@ export function updateNeuralWave(time) {
 
         // Escala: respiración base + pulso de onda
         const breathe   = 1 + Math.sin(time * 1.2 + idx * 0.3) * 0.04;
-        const waveScale = 1 + totalIntensity * 0.7;
+        const waveScale = 1 + totalIntensity * 0.4;
         const s = breathe * waveScale;
         neuralGroup.children[idx].scale.set(s, s, s);
     });
