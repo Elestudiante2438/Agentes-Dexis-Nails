@@ -10,7 +10,7 @@ const bubbleGeo = new THREE.SphereGeometry(5.5, 64, 64);
 export const bubbleMat = new THREE.MeshStandardMaterial({
     color: 0x000000, emissive: 0x000000,
     metalness: 0.85, roughness: 0.1,
-    transparent: true, opacity: 0.08,
+    transparent: true, opacity: 0.03,
     side: THREE.DoubleSide, depthWrite: false,
 });
 export const bubble = new THREE.Mesh(bubbleGeo, bubbleMat);

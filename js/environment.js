@@ -16,20 +16,39 @@ const warpTrail = new Float32Array(WARP_COUNT * 3); // posición trasera (rastro
 const warpDir   = new Float32Array(WARP_COUNT * 3); // dirección normalizada
 const warpSpeed = new Float32Array(WARP_COUNT);      // velocidad individual
 
+// ── Textura circular con glow para partículas warp (elimina cuadrados) ────────
+function makeCircleSprite() {
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    const half = size / 2;
+    const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+    gradient.addColorStop(0,   'rgba(255,255,255,1)');
+    gradient.addColorStop(0.3, 'rgba(200,230,255,0.8)');
+    gradient.addColorStop(0.7, 'rgba(100,180,255,0.3)');
+    gradient.addColorStop(1,   'rgba(0,0,0,0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(canvas);
+}
+const CIRCLE_SPRITE = makeCircleSprite();
+
+// Fix 5: Aplanar eje Y al nacer — efecto corredor/túnel más pronunciado
+// Los rayos se concentran lateralmente (XZ), el Y queda comprimido
 function initWarpParticle(i) {
-    // Nacer en una esfera pequeña alrededor del origen — punto de fuga
     const r     = 2 + Math.random() * 4;
     const theta = Math.random() * Math.PI * 2;
     const phi   = Math.acos(2 * Math.random() - 1);
     const x = r * Math.sin(phi) * Math.cos(theta);
-    const y = r * Math.sin(phi) * Math.sin(theta);
+    // Comprimir eje Y al 45% — da sensación de corredor horizontal
+    const y = r * Math.sin(phi) * Math.sin(theta) * 0.45;
     const z = r * Math.cos(phi);
 
     warpPos[i*3]   = x;
     warpPos[i*3+1] = y;
     warpPos[i*3+2] = z;
 
-    // Dirección: desde el origen hacia afuera — lo que crea el efecto túnel
     const len = Math.sqrt(x*x + y*y + z*z);
     warpDir[i*3]   = x / len;
     warpDir[i*3+1] = y / len;
@@ -37,7 +56,6 @@ function initWarpParticle(i) {
 
     warpSpeed[i] = 0.6 + Math.random() * 0.8;
 
-    // Trail empieza en la misma posición
     warpTrail[i*3]   = x;
     warpTrail[i*3+1] = y;
     warpTrail[i*3+2] = z;
@@ -61,9 +79,12 @@ const warpHeadGeo = new THREE.BufferGeometry();
 warpHeadGeo.setAttribute('position', new THREE.BufferAttribute(warpPos.slice(), 3));
 
 const warpHeadMat = new THREE.PointsMaterial({
-    color: 0xffffff, size: 0.18,
-    transparent: true, opacity: 0.9,
+    color: 0xffffff, size: 0.55,
+    map: CIRCLE_SPRITE,
+    transparent: true, opacity: 0.95,
     blending: THREE.AdditiveBlending, depthWrite: false,
+    sizeAttenuation: true,
+    alphaTest: 0.01,
 });
 const warpHeads = new THREE.Points(warpHeadGeo, warpHeadMat);
 scene.add(warpHeads);

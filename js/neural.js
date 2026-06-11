@@ -24,7 +24,7 @@ const COLOR_WAVE_A = new THREE.Color(0xffd700); // dorado
 const COLOR_WAVE_B = new THREE.Color(0xcc44ff); // violeta
 const COLOR_WAVE_C = new THREE.Color(0x00ffcc); // cian
 
-const nodeGeo = new THREE.SphereGeometry(window.innerWidth < 768 ? 0.055 : 0.045, 8, 8);
+const nodeGeo = new THREE.SphereGeometry(window.innerWidth < 768 ? 0.09 : 0.055, 8, 8);
 
 for (let i = 0; i < NEURAL_NODE_COUNT; i++) {
     const phi      = Math.acos(1 - 2 * (i + 0.5) / NEURAL_NODE_COUNT);

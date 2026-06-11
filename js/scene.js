@@ -38,13 +38,9 @@ export function setTopView() {
     const isMobile = window.innerWidth < 768;
 
     if (isMobile) {
-        // FOV 45° — para ver una esfera de radio ~5.5 completa con aire:
-        // distancia = radio / tan(FOV/2) * factor_seguridad
-        // 5.5 / tan(22.5°) * 1.35 ≈ 19.5 — redondeamos a 20
-        // y bajo para centrar verticalmente la escena (núcleo en y=0.5)
-        camera.position.set(0, 5, 28);
-        controls.minDistance = 8;
-        controls.maxDistance = 30;
+        camera.position.set(0, 4, 32);
+        controls.minDistance = 10;
+        controls.maxDistance = 35;
     } else {
         camera.position.set(0, 5, 28);
         controls.minDistance = 8;
