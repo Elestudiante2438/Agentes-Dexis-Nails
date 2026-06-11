@@ -2,13 +2,25 @@ import { setListeningMode, setSpeakingMode, setSilenceMode, setListeningActive }
 import { setWarpVoice, setWarpListen, setWarpIdle } from './environment.js';
 import { setNeuralIntensity } from './neural.js';
 
-// =============================================
-// VOZ Y DEXIS
-// =============================================
 let isSpeaking = false;
 let listeningActive = false;
 let recognition = null;
 export let currentRingSpeed = 0.03;
+
+async function callDeepSeekDirectly(userText) {
+    try {
+        const response = await fetch('/.netlify/functions/deepseek', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mensaje: userText, contexto: {} })
+        });
+        const data = await response.json();
+        return data.respuesta || "No pude procesar tu mensaje. Intenta de nuevo.";
+    } catch (err) {
+        console.error('[Voice] Error llamando a deepseek:', err);
+        return "Tengo un problema técnico. Intenta en unos segundos.";
+    }
+}
 
 export async function startListening() {
     if (listeningActive) return;
@@ -48,13 +60,15 @@ export async function startListening() {
     };
 
     recognition.onend = () => {
+        // Si sigue activo, reiniciamos (para móvil)
         if (listeningActive) {
-            console.log('[Dexis] Reconocimiento terminado pero sigue activo');
+            console.log('[Voice] Reconocimiento terminado pero sigue activo, reiniciando...');
+            try { recognition.start(); } catch(e) { console.warn(e); }
         }
     };
 
     recognition.onerror = (event) => {
-        console.warn('[Dexis] Error:', event.error);
+        console.warn('[Voice] Error:', event.error);
         if (event.error === 'not-allowed') {
             const statusEl = document.getElementById('statusMsg');
             if (statusEl) statusEl.innerHTML = '🔒 Permiso denegado. Activa el micrófono en la URL 🔒';
@@ -63,14 +77,23 @@ export async function startListening() {
         }
     };
 
-    recognition.onresult = (event) => {
+    recognition.onresult = async (event) => {
         let finalText = '';
         for (let i = event.resultIndex; i < event.results.length; i++)
             if (event.results[i].isFinal) finalText += event.results[i][0].transcript + ' ';
         if (finalText) {
             setSpeakingMode();
             setNeuralIntensity(3.0);
-            processUserText(finalText.trim());
+            const respuesta = await callDeepSeekDirectly(finalText.trim());
+            speakResponse(respuesta);
+            const statusEl = document.getElementById('statusMsg');
+            if (statusEl) {
+                statusEl.innerHTML = `🤖 Dexis: ${respuesta.substring(0, 80)}${respuesta.length > 80 ? '…' : ''}`;
+                setTimeout(() => {
+                    if (listeningActive) statusEl.innerHTML = '🎤 Escuchando…';
+                    else statusEl.innerHTML = '⚪ Sistema listo';
+                }, 5000);
+            }
             setTimeout(() => {
                 if (listeningActive) {
                     setListeningMode();
@@ -88,17 +111,13 @@ export async function startListening() {
     try {
         recognition.start();
     } catch(e) {
-        console.warn('[Dexis] No se pudo iniciar:', e.message);
+        console.warn('[Voice] No se pudo iniciar:', e.message);
     }
 }
 
 export function stopListening() {
     if (recognition) {
-        try {
-            recognition.stop();
-        } catch(e) {
-            console.warn('[Dexis] Error al detener recognition:', e.message);
-        }
+        try { recognition.stop(); } catch(e) { console.warn(e); }
         recognition = null;
     }
     listeningActive = false;
@@ -109,33 +128,6 @@ export function stopListening() {
     setSilenceMode();
     setNeuralIntensity(1.0);
     setWarpIdle();
-}
-
-async function getDexiResponse(userText) {
-    const lower = userText.toLowerCase();
-    if (lower.includes('dexis'))
-        return { respuesta: "Soy Dexis, tu asistente. ¿En qué te ayudo?", agenteNombre: 'Dexis' };
-    if (lower.includes('ayuda'))
-        return { respuesta: "Claro. Puedes reservar servicios, consultar inventario o preguntar por productos. ¿Qué necesitas?", agenteNombre: 'Dexis' };
-    if (!window.Dexis || typeof window.Dexis.responder !== 'function') {
-        return { respuesta: "Estoy aquí. Mis sistemas están listos. ¿En qué te ayudo?", agenteNombre: 'Dexis' };
-    }
-    const respuesta = await window.Dexis.responder(userText);
-    return { respuesta, agenteNombre: 'Dexis' };
-}
-
-async function processUserText(text) {
-    if (!text.trim()) return;
-    const { respuesta } = await getDexiResponse(text);
-    speakResponse(respuesta);
-    const statusEl = document.getElementById('statusMsg');
-    if (statusEl) {
-        statusEl.innerHTML = `🤖 Dexis: ${respuesta.substring(0, 80)}${respuesta.length > 80 ? '…' : ''}`;
-        setTimeout(() => {
-            if (listeningActive) statusEl.innerHTML = '🎤 Escuchando…';
-            else statusEl.innerHTML = '⚪ Sistema listo';
-        }, 5000);
-    }
 }
 
 function speakResponse(text) {
@@ -151,10 +143,7 @@ function speakResponse(text) {
     window.speechSynthesis.speak(u);
 }
 
-// =============================================
-// EXPORTACIÓN GLOBAL PARA PRUEBAS Y BOTONES
-// =============================================
 window.startListening = startListening;
 window.stopListening = stopListening;
 
-console.log('✅ Voice module loaded');
+console.log('✅ Voice module loaded (direct fetch)');
