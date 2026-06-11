@@ -54,12 +54,10 @@ for (let i = 0; i < NEURAL_NODE_COUNT; i++) {
     // spatialNoise ∈ [0, 1] — mapea a hue [0, 1] cubriendo todo el espectro
     nodeHueOffset.push(spatialNoise % 1.0);
 
-    const mat = new THREE.MeshStandardMaterial({
-        color:             new THREE.Color().setHSL(spatialNoise % 1.0, 1.0, 0.55),
-        emissive:          new THREE.Color().setHSL(spatialNoise % 1.0, 1.0, 0.55),
-        emissiveIntensity: 2.2,
-        metalness: 0.0, roughness: 0.15,
+    const mat = new THREE.MeshBasicMaterial({
+        color:       new THREE.Color().setHSL(spatialNoise % 1.0, 1.0, 0.60),
         transparent: true, opacity: 0.95, depthWrite: false,
+        blending:    THREE.AdditiveBlending,
     });
     nodeMaterials.push(mat);
 
@@ -121,7 +119,7 @@ export const pulseStates = edgePairs.map(() => ({
 // Además hay una onda de "brillo" que recorre la esfera para marcar pulsos
 const AURORA_SPEED   = 0.018;   // velocidad de rotación del espectro HSL
 const AURORA_SAT     = 1.0;     // saturación plena
-const AURORA_LIGHT   = 0.58;    // luminosidad base de nodos
+const AURORA_LIGHT   = 0.50;    // luminosidad base — más bajo = color más vivo
 const LINE_LIGHT     = 0.42;    // líneas más oscuras que nodos
 
 // Onda de brillo (pulso radial — ahora solo afecta brightness, no color)
@@ -171,12 +169,13 @@ export function updateNeuralWave(time) {
         const lightBoost = maxWave * 0.25 * neuralIntensity;
         const light = Math.min(AURORA_LIGHT + lightBoost, 0.82);
 
-        _nc.setHSL(hue, AURORA_SAT, light);
+        // FIX: BasicMaterial — solo color, no emissive
+        // Luminosidad más baja base para que el color se vea vivo, no quemado
+        const lightFinal = Math.min(AURORA_LIGHT + lightBoost, 0.72);
+        _nc.setHSL(hue, AURORA_SAT, lightFinal);
 
         const mat = nodeMaterials[idx];
         mat.color.copy(_nc);
-        mat.emissive.copy(_nc);
-        mat.emissiveIntensity = (2.2 + maxWave * 2.0) * neuralIntensity;
 
         // FIX: frecuencia y amplitud únicas por nodo — pulsado verdaderamente individual
         // nodeHueOffset se reutiliza como seed de variación (ya es único por posición)
