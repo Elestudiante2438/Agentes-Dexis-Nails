@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { scene, camera, renderer, controls, setTopView, isPageVisible } from './scene.js';
 import { bubble, core, coreMat, dodecahedron, dodecaMat, ring1, ring2, ring3, particleMat, edgesMat, vertexMat, glowShell, ringState } from './nucleus.js';
-import { neuralGroup, nodeMat, neuralLineMat, setNeuralIntensity, edgePairs, pulseStates } from './neural.js';
+import { neuralGroup, neuralLineMat, setNeuralIntensity, setNodeHSL, updateNeuralWave, edgePairs, pulseStates } from './neural.js';
 import { starsBg, planetFigures, ships } from './environment.js';
 import './voice.js';
 import './ui.js';
@@ -91,21 +91,21 @@ function animate() {
         }
     });
 
-    // Malla neural
+    // Malla neural — rotación base + onda
     if (neuralGroup) {
         neuralGroup.rotation.y += 0.0005;
         neuralGroup.rotation.x += 0.00015;
     }
+    updateNeuralWave(time);
 
-    // Partículas
+    // Partículas + cycling de color en modo idle
     if (!window.listeningActive && !window.isSpeaking) {
         particleHue = (particleHue + 0.004) % 1;
         particleMat.color.setHSL(particleHue, 1, 0.6);
-        if (nodeMat) {
-            nodeMat.color.setHSL(particleHue, 1, 0.65);
-            nodeMat.emissive.setHSL(particleHue, 1, 0.45);
-        }
-        if (neuralLineMat) neuralLineMat.color.setHSL(particleHue, 1, 0.6);
+        // setNodeHSL reemplaza nodeMat.color.setHSL — aplica HSL suave a todos los nodos
+        // pero con lerp lento para no interrumpir las ondas
+        setNodeHSL(particleHue, 1, 0.65);
+        // neuralLineMat.color ya no tiene efecto con vertexColors:true — se omite
     }
 
     // Estrellas
