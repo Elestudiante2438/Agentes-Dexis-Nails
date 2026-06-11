@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { scene, camera, renderer, controls, setTopView, isPageVisible } from './scene.js';
 import { bubble, core, coreMat, dodecahedron, dodecaMat, ring1, ring2, ring3, particleMat, edgesMat, vertexMat, glowShell, ringState } from './nucleus.js';
 import { neuralGroup, neuralLineMat, setNeuralIntensity, setNodeHSL, updateNeuralWave, edgePairs, pulseStates } from './neural.js';
-import { starsBg, planetFigures, ships } from './environment.js';
+import { starsBg, planetFigures, ships, updateWarp } from './environment.js';
 import './voice.js';
 import './ui.js';
 
@@ -108,8 +108,8 @@ function animate() {
         // neuralLineMat.color ya no tiene efecto con vertexColors:true — se omite
     }
 
-    // Estrellas
-    starsBg.material.opacity = 0.4 + Math.sin(time * 2.5) * 0.28;
+    // Warp — hiperespacio
+    updateWarp();
 
     controls.update();
     renderer.render(scene, camera);

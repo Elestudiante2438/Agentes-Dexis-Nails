@@ -1,4 +1,5 @@
 import { setListeningMode, setSpeakingMode, setSilenceMode, setListeningActive } from './nucleus.js';
+import { setWarpVoice, setWarpListen, setWarpIdle } from './environment.js';
 import { setNeuralIntensity } from './neural.js';
 
 // =============================================
@@ -43,6 +44,7 @@ export async function startListening() {
         if (statusEl) statusEl.innerHTML = '🎤 Escuchando…';
         setListeningMode();
         setNeuralIntensity(2.0);
+        setWarpListen();
     };
 
     recognition.onend = () => {
@@ -73,9 +75,11 @@ export async function startListening() {
                 if (listeningActive) {
                     setListeningMode();
                     setNeuralIntensity(2.0);
+                    setWarpListen();
                 } else {
                     setSilenceMode();
                     setNeuralIntensity(1.0);
+                    setWarpIdle();
                 }
             }, 1000);
         }
@@ -104,6 +108,7 @@ export function stopListening() {
     if (statusEl) statusEl.innerHTML = '⚪ Sistema listo';
     setSilenceMode();
     setNeuralIntensity(1.0);
+    setWarpIdle();
 }
 
 async function getDexiResponse(userText) {

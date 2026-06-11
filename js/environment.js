@@ -2,22 +2,185 @@ import * as THREE from 'three';
 import { scene } from './scene.js';
 
 // =============================================
-// ESTRELLAS DE FONDO
+// WARP — efecto hiperespacio 3D
 // =============================================
-const starCount = 2500;
-const starPos = new Float32Array(starCount * 3);
-for (let i = 0; i < starCount; i++) {
-    starPos[i*3]   = (Math.random() - 0.5) * 500;
-    starPos[i*3+1] = (Math.random() - 0.5) * 250;
-    starPos[i*3+2] = (Math.random() - 0.5) * 180 - 50;
+const WARP_COUNT  = 1800;                  // partículas totales
+const WARP_RADIUS = 120;                   // distancia máxima desde el origen
+const WARP_SPEED_BASE  = 0.55;            // velocidad base (idle)
+const WARP_SPEED_VOICE = 2.8;             // velocidad al hablar
+const WARP_SPEED_LISTEN = 1.4;            // velocidad al escuchar
+
+// Cada partícula: posición actual + dirección radial normalizada + velocidad individual
+const warpPos   = new Float32Array(WARP_COUNT * 3); // posición (punto)
+const warpTrail = new Float32Array(WARP_COUNT * 3); // posición trasera (rastro)
+const warpDir   = new Float32Array(WARP_COUNT * 3); // dirección normalizada
+const warpSpeed = new Float32Array(WARP_COUNT);      // velocidad individual
+
+function initWarpParticle(i) {
+    // Nacer en una esfera pequeña alrededor del origen — punto de fuga
+    const r     = 2 + Math.random() * 4;
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+    const x = r * Math.sin(phi) * Math.cos(theta);
+    const y = r * Math.sin(phi) * Math.sin(theta);
+    const z = r * Math.cos(phi);
+
+    warpPos[i*3]   = x;
+    warpPos[i*3+1] = y;
+    warpPos[i*3+2] = z;
+
+    // Dirección: desde el origen hacia afuera — lo que crea el efecto túnel
+    const len = Math.sqrt(x*x + y*y + z*z);
+    warpDir[i*3]   = x / len;
+    warpDir[i*3+1] = y / len;
+    warpDir[i*3+2] = z / len;
+
+    warpSpeed[i] = 0.6 + Math.random() * 0.8;
+
+    // Trail empieza en la misma posición
+    warpTrail[i*3]   = x;
+    warpTrail[i*3+1] = y;
+    warpTrail[i*3+2] = z;
 }
-const starGeo = new THREE.BufferGeometry();
-starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-export const starsBg = new THREE.Points(starGeo, new THREE.PointsMaterial({
-    color: 0xffffff, size: 0.08, transparent: true, opacity: 0.7,
+
+// Inicializar distribuidas por todo el volumen (no solo en el centro)
+for (let i = 0; i < WARP_COUNT; i++) {
+    initWarpParticle(i);
+    // Dispersar aleatoriamente en profundidad para evitar flash inicial
+    const spread = Math.random();
+    warpPos[i*3]   += warpDir[i*3]   * WARP_RADIUS * spread;
+    warpPos[i*3+1] += warpDir[i*3+1] * WARP_RADIUS * spread;
+    warpPos[i*3+2] += warpDir[i*3+2] * WARP_RADIUS * spread;
+    warpTrail[i*3]   = warpPos[i*3];
+    warpTrail[i*3+1] = warpPos[i*3+1];
+    warpTrail[i*3+2] = warpPos[i*3+2];
+}
+
+// Geometría de puntos (cabeza del rastro)
+const warpHeadGeo = new THREE.BufferGeometry();
+warpHeadGeo.setAttribute('position', new THREE.BufferAttribute(warpPos.slice(), 3));
+
+const warpHeadMat = new THREE.PointsMaterial({
+    color: 0xffffff, size: 0.18,
+    transparent: true, opacity: 0.9,
     blending: THREE.AdditiveBlending, depthWrite: false,
-}));
-scene.add(starsBg);
+});
+const warpHeads = new THREE.Points(warpHeadGeo, warpHeadMat);
+scene.add(warpHeads);
+
+// Geometría de líneas (rastros de velocidad)
+// Cada rastro es un segmento: [cabeza, cola] — 2 vértices por partícula
+const trailVerts = new Float32Array(WARP_COUNT * 6);
+for (let i = 0; i < WARP_COUNT; i++) {
+    trailVerts[i*6]   = warpPos[i*3];
+    trailVerts[i*6+1] = warpPos[i*3+1];
+    trailVerts[i*6+2] = warpPos[i*3+2];
+    trailVerts[i*6+3] = warpTrail[i*3];
+    trailVerts[i*6+4] = warpTrail[i*3+1];
+    trailVerts[i*6+5] = warpTrail[i*3+2];
+}
+
+// Colores por vértice — cabeza blanca/cian, cola desvanece a negro
+const trailColors = new Float32Array(WARP_COUNT * 6);
+for (let i = 0; i < WARP_COUNT; i++) {
+    // Cabeza: blanco-cian brillante
+    trailColors[i*6]   = 0.7 + Math.random() * 0.3;
+    trailColors[i*6+1] = 0.85 + Math.random() * 0.15;
+    trailColors[i*6+2] = 1.0;
+    // Cola: negro (transparencia por color)
+    trailColors[i*6+3] = 0;
+    trailColors[i*6+4] = 0;
+    trailColors[i*6+5] = 0;
+}
+
+const trailGeo = new THREE.BufferGeometry();
+trailGeo.setAttribute('position', new THREE.BufferAttribute(trailVerts, 3));
+trailGeo.setAttribute('color',    new THREE.BufferAttribute(trailColors, 3));
+
+const trailMat = new THREE.LineBasicMaterial({
+    vertexColors: true,
+    transparent: true, opacity: 0.7,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+});
+const warpTrails = new THREE.LineSegments(trailGeo, trailMat);
+scene.add(warpTrails);
+
+// Estado de velocidad warp — voice.js puede escribir aquí
+export const warpState = { speed: WARP_SPEED_BASE };
+export function setWarpVoice()   { warpState.speed = WARP_SPEED_VOICE; }
+export function setWarpListen()  { warpState.speed = WARP_SPEED_LISTEN; }
+export function setWarpIdle()    { warpState.speed = WARP_SPEED_BASE; }
+
+// Colores de rastro según modo
+const COLOR_IDLE    = { r: 0.7,  g: 0.9,  b: 1.0  }; // cian frío
+const COLOR_LISTEN  = { r: 0.4,  g: 0.6,  b: 1.0  }; // azul escucha
+const COLOR_VOICE   = { r: 1.0,  g: 0.85, b: 0.3  }; // dorado hablar
+let   _targetColor  = COLOR_IDLE;
+let   _currentColor = { ...COLOR_IDLE };
+
+export function updateWarp() {
+    const spd = warpState.speed;
+
+    // Suavizar color hacia target
+    _currentColor.r += (_targetColor.r - _currentColor.r) * 0.05;
+    _currentColor.g += (_targetColor.g - _currentColor.g) * 0.05;
+    _currentColor.b += (_targetColor.b - _currentColor.b) * 0.05;
+
+    // Detectar modo por velocidad
+    if      (spd >= WARP_SPEED_VOICE  * 0.9) _targetColor = COLOR_VOICE;
+    else if (spd >= WARP_SPEED_LISTEN * 0.9) _targetColor = COLOR_LISTEN;
+    else                                       _targetColor = COLOR_IDLE;
+
+    const posAttr   = warpHeadGeo.attributes.position;
+    const trailAttr = trailGeo.attributes.position;
+    const colorAttr = trailGeo.attributes.color;
+
+    // Longitud del rastro proporcional a la velocidad — más rápido = rastro más largo
+    const trailLength = 0.8 + spd * 1.2;
+
+    for (let i = 0; i < WARP_COUNT; i++) {
+        const dx = warpDir[i*3];
+        const dy = warpDir[i*3+1];
+        const dz = warpDir[i*3+2];
+        const v  = warpSpeed[i] * spd;
+
+        // Mover cabeza hacia afuera
+        warpPos[i*3]   += dx * v;
+        warpPos[i*3+1] += dy * v;
+        warpPos[i*3+2] += dz * v;
+
+        // Cola sigue a la cabeza con rezago = longitud del rastro
+        warpTrail[i*3]   = warpPos[i*3]   - dx * trailLength * warpSpeed[i];
+        warpTrail[i*3+1] = warpPos[i*3+1] - dy * trailLength * warpSpeed[i];
+        warpTrail[i*3+2] = warpPos[i*3+2] - dz * trailLength * warpSpeed[i];
+
+        // Distancia desde origen
+        const px = warpPos[i*3], py = warpPos[i*3+1], pz = warpPos[i*3+2];
+        const dist = Math.sqrt(px*px + py*py + pz*pz);
+
+        // Reiniciar cuando sale del volumen
+        if (dist > WARP_RADIUS) initWarpParticle(i);
+
+        // Actualizar buffers
+        posAttr.setXYZ(i, warpPos[i*3], warpPos[i*3+1], warpPos[i*3+2]);
+
+        trailAttr.setXYZ(i*2,   warpPos[i*3],   warpPos[i*3+1],   warpPos[i*3+2]);
+        trailAttr.setXYZ(i*2+1, warpTrail[i*3], warpTrail[i*3+1], warpTrail[i*3+2]);
+
+        // Color cabeza = color actual del modo
+        colorAttr.setXYZ(i*2,   _currentColor.r, _currentColor.g, _currentColor.b);
+        // Cola siempre negra — gradiente natural
+        colorAttr.setXYZ(i*2+1, 0, 0, 0);
+    }
+
+    posAttr.needsUpdate   = true;
+    trailAttr.needsUpdate = true;
+    colorAttr.needsUpdate = true;
+}
+
+// starsBg exportado como alias para compatibilidad con main.js
+// (main.js anima starsBg.material.opacity — redirigimos a trailMat)
+export const starsBg = { material: trailMat };
 
 // =============================================
 // PLANETAS — textura procedural + datos API
