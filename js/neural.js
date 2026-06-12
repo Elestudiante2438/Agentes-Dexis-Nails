@@ -38,21 +38,14 @@ for (let i = 0; i < NEURAL_NODE_COUNT; i++) {
     nodePositions.push(pos);
     nodeDistances.push(pos.length());
 
-    // ── Fase de color basada en posición esférica del nodo ──────────────────
-    // FIX: combinar distribución uniforme (índice dorado) con variación espacial
-    // para cubrir TODO el espectro uniformemente y que zonas cercanas tengan
-    // colores similares (efecto aurora de manchas de color, no arcoíris lineal)
     const nx = pos.x / NEURAL_RADIUS;
     const ny = pos.y / NEURAL_RADIUS;
     const nz = pos.z / NEURAL_RADIUS;
-    // Base uniforme: secuencia dorada garantiza que los N nodos cubran 0..1 sin sesgo
     const goldenBase = (i * 0.618033988749895) % 1.0;
-    // Perturbación espacial suave: nodos cercanos se agrupan en zonas de color
     const spatialPerturb =
         Math.sin(nx * 2.3 + ny * 1.7) * 0.12 +
         Math.sin(ny * 3.1 + nz * 2.0) * 0.10 +
         Math.sin(nz * 1.9 + nx * 2.8) * 0.08;
-    // Resultado: distribución uniforme + agrupación suave por zona
     const hueBase = ((goldenBase + spatialPerturb) % 1.0 + 1.0) % 1.0;
     nodeHueOffset.push(hueBase);
 
@@ -83,7 +76,6 @@ for (let i = 0; i < NEURAL_NODE_COUNT; i++) {
 
 export const edgeGeo = new THREE.BufferGeometry().setFromPoints(edgePoints);
 const edgeColorArray = new Float32Array(edgePoints.length * 3);
-// Inicializar con el color de posición de cada extremo
 const _initC = new THREE.Color();
 for (let e = 0; e < edgePairs.length; e++) {
     const [iA, iB] = edgePairs[e];
@@ -113,18 +105,11 @@ export const pulseStates = edgePairs.map(() => ({
 }));
 
 // ── Sistema de color aurora ───────────────────────────────────────────────────
-// Cada nodo tiene su hueOffset base (posición espacial).
-// En cada frame, el hue actual = hueOffset + tiempo * velocidad de rotación
-// → todos los colores avanzan juntos, manteniendo las zonas de color
-//   pero mutando el espectro completo (aurora efecto)
-//
-// Además hay una onda de "brillo" que recorre la esfera para marcar pulsos
-const AURORA_SPEED   = 0.040;   // velocidad de rotación del espectro HSL — más perceptible
-const AURORA_SAT     = 1.0;     // saturación plena
-const AURORA_LIGHT   = 0.50;    // luminosidad base — más bajo = color más vivo
-const LINE_LIGHT     = 0.42;    // líneas más oscuras que nodos
+const AURORA_SPEED   = 0.040;
+const AURORA_SAT     = 1.0;
+const AURORA_LIGHT   = 0.50;
+const LINE_LIGHT     = 0.42;
 
-// Onda de brillo (pulso radial — ahora solo afecta brightness, no color)
 const WAVE_MAX_R  = NEURAL_RADIUS * 1.25;
 const WAVE_SPEED  = 0.045;
 const WAVE_WIDTH  = 1.5;
@@ -136,8 +121,6 @@ function waveIntensity(dist, waveRadius) {
     return Math.pow(Math.sin((1 - delta / WAVE_WIDTH) * Math.PI * 0.5), 1.2);
 }
 
-// ── Noise suave para displacement de nodos ────────────────────────────────────
-// Value noise 3D ligero — produce ondulación orgánica sin GLSL
 function vNoise(x, y, z) {
     const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
     const fx = x - ix, fy = y - iy, fz = z - iz;
@@ -151,18 +134,17 @@ function vNoise(x, y, z) {
     return y0+(y1-y0)*uz;
 }
 
-// Posiciones base de los nodos (sin desplazamiento) — se preservan para el noise
 const nodeBasePositions = nodePositions.map(p => p.clone());
 
-// Escala de desplazamiento noise — sutil, no deforma la esfera
-const NOISE_DISP_AMP  = 0.18;   // amplitud máxima de desplazamiento (unidades Three.js)
-const NOISE_DISP_FREQ = 0.55;   // frecuencia espacial del noise
-const NOISE_TIME_FREQ = 0.28;   // qué tan rápido evoluciona el noise en el tiempo
+const NOISE_DISP_AMP  = 0.18;
+const NOISE_DISP_FREQ = 0.55;
+const NOISE_TIME_FREQ = 0.28;
 
-// ── Y-position color shift ─────────────────────────────────────────────────────
-// Módula la luminosidad del nodo según su posición Y actual (post-rotación aparente)
-// Como la malla rota en múltiples ejes, el "Y actual" cambia continuamente → efecto aurora
-const Y_SHIFT_AMP = 0.12;  // ±12% variación de luminosidad por posición Y
+const Y_SHIFT_AMP = 0.12;
+
+// 🔧 FIX: declarar la variable que faltaba
+let neuralIntensity = 1.0;
+
 export function setNeuralIntensity(v) { neuralIntensity = v; }
 export function setNodeHSL(h, s, l)   { /* gestionado por aurora */ }
 
@@ -170,25 +152,19 @@ const _nc = new THREE.Color();
 const _lc = new THREE.Color();
 
 export function updateNeuralWave(time) {
-    // Avanzar ondas de brillo
     for (let w = 0; w < 3; w++) {
         waveRadii[w] += WAVE_SPEED;
         if (waveRadii[w] > WAVE_MAX_R) waveRadii[w] = 0;
     }
 
-    // Hue global que avanza con el tiempo — desplaza todo el espectro
     const globalHueShift = (time * AURORA_SPEED) % 1.0;
 
-    // ── Nodos ─────────────────────────────────────────────────────────────────
     for (let idx = 0; idx < NEURAL_NODE_COUNT; idx++) {
         const base = nodeBasePositions[idx];
 
-        // ── Noise displacement: desplaza cada nodo desde su posición base ──────
-        // El noise evoluciona con el tiempo → los puntos se mueven orgánicamente
         const nx = base.x * NOISE_DISP_FREQ + time * NOISE_TIME_FREQ;
         const ny = base.y * NOISE_DISP_FREQ + time * NOISE_TIME_FREQ * 0.7;
         const nz = base.z * NOISE_DISP_FREQ + time * NOISE_TIME_FREQ * 0.9;
-        // Tres canales de noise independientes para XYZ (offset 100/200 evita correlación)
         const dispX = (vNoise(nx,        ny + 13.7, nz + 7.3)  - 0.5) * 2 * NOISE_DISP_AMP;
         const dispY = (vNoise(nx + 100,  ny + 5.1,  nz + 21.9) - 0.5) * 2 * NOISE_DISP_AMP;
         const dispZ = (vNoise(nx + 200,  ny + 31.4, nz + 3.7)  - 0.5) * 2 * NOISE_DISP_AMP;
@@ -199,26 +175,19 @@ export function updateNeuralWave(time) {
 
         nodeMeshes[idx].position.set(worldX, worldY, worldZ);
 
-        // Distancia real (post-displacement) para la onda de brillo
         const dist = Math.sqrt(worldX*worldX + worldY*worldY + worldZ*worldZ);
 
-        // Hue del nodo = su offset espacial + desplazamiento temporal global
         const hue = (nodeHueOffset[idx] + globalHueShift) % 1.0;
 
-        // ── Y-position color shift: luminosidad modulada por altura actual ──────
-        // worldY varía entre ≈ -NEURAL_RADIUS y +NEURAL_RADIUS
-        // → normalizado a [-1, 1] → boost/atenuación de luz
         const yNorm     = Math.max(-1, Math.min(1, worldY / NEURAL_RADIUS));
-        const yLightMod = yNorm * Y_SHIFT_AMP; // +Y = más brillante, -Y = más oscuro
+        const yLightMod = yNorm * Y_SHIFT_AMP;
 
-        // Intensidad de onda de brillo en este nodo
         let maxWave = 0;
         for (let w = 0; w < 3; w++) {
             const wi = waveIntensity(dist, waveRadii[w]);
             if (wi > maxWave) maxWave = wi;
         }
 
-        // Luminosidad: base + boost de onda + Y-shift + boost de neuralIntensity
         const lightBoost = maxWave * 0.25 * neuralIntensity;
         const lightFinal = Math.min(AURORA_LIGHT + lightBoost + yLightMod, 0.72);
         _nc.setHSL(hue, AURORA_SAT, lightFinal);
@@ -234,7 +203,6 @@ export function updateNeuralWave(time) {
         nodeMeshes[idx].scale.set(sc, sc, sc);
     }
 
-    // ── Líneas aurora ─────────────────────────────────────────────────────────
     const colorAttr = edgeGeo.attributes.color;
     for (let e = 0; e < edgePairs.length; e++) {
         const [iA, iB] = edgePairs[e];
@@ -242,13 +210,11 @@ export function updateNeuralWave(time) {
         const hueA = (nodeHueOffset[iA] + globalHueShift) % 1.0;
         const hueB = (nodeHueOffset[iB] + globalHueShift) % 1.0;
 
-        // Y-position shift en líneas — usa posición actual desplazada del nodo
         const posA = nodeMeshes[iA].position;
         const posB = nodeMeshes[iB].position;
         const yModA = Math.max(-1, Math.min(1, posA.y / NEURAL_RADIUS)) * Y_SHIFT_AMP * 0.7;
         const yModB = Math.max(-1, Math.min(1, posB.y / NEURAL_RADIUS)) * Y_SHIFT_AMP * 0.7;
 
-        // Boost de brillo en líneas según onda
         let wA = 0, wB = 0;
         const dA = posA.length(), dB = posB.length();
         for (let w = 0; w < 3; w++) {
@@ -263,7 +229,6 @@ export function updateNeuralWave(time) {
     }
     colorAttr.needsUpdate = true;
 
-    // Opacidad dinámica de líneas
     const avgR   = (waveRadii[0] + waveRadii[1] + waveRadii[2]) / (3 * WAVE_MAX_R);
     const baseOp = isMobile ? 0.14 : 0.22;
     const peakOp = isMobile ? 0.28 : 0.42;
