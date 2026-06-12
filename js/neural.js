@@ -81,7 +81,7 @@ for (let i = 0; i < NEURAL_NODE_COUNT; i++) {
     }
 }
 
-const edgeGeo = new THREE.BufferGeometry().setFromPoints(edgePoints);
+export const edgeGeo = new THREE.BufferGeometry().setFromPoints(edgePoints);
 const edgeColorArray = new Float32Array(edgePoints.length * 3);
 // Inicializar con el color de posición de cada extremo
 const _initC = new THREE.Color();
@@ -136,7 +136,33 @@ function waveIntensity(dist, waveRadius) {
     return Math.pow(Math.sin((1 - delta / WAVE_WIDTH) * Math.PI * 0.5), 1.2);
 }
 
-export let neuralIntensity = 1.0;
+// ── Noise suave para displacement de nodos ────────────────────────────────────
+// Value noise 3D ligero — produce ondulación orgánica sin GLSL
+function vNoise(x, y, z) {
+    const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+    const fx = x - ix, fy = y - iy, fz = z - iz;
+    const ux = fx*fx*(3-2*fx), uy = fy*fy*(3-2*fy), uz = fz*fz*(3-2*fz);
+    const h = (a,b,c) => { const n = Math.sin(a*127.1+b*311.7+c*74.3)*43758.5453; return n-Math.floor(n); };
+    const v000=h(ix,iy,iz),  v100=h(ix+1,iy,iz),  v010=h(ix,iy+1,iz),  v110=h(ix+1,iy+1,iz);
+    const v001=h(ix,iy,iz+1),v101=h(ix+1,iy,iz+1),v011=h(ix,iy+1,iz+1),v111=h(ix+1,iy+1,iz+1);
+    const x0=v000+(v100-v000)*ux, x1=v010+(v110-v010)*ux;
+    const x2=v001+(v101-v001)*ux, x3=v011+(v111-v011)*ux;
+    const y0=x0+(x1-x0)*uy,       y1=x2+(x3-x2)*uy;
+    return y0+(y1-y0)*uz;
+}
+
+// Posiciones base de los nodos (sin desplazamiento) — se preservan para el noise
+const nodeBasePositions = nodePositions.map(p => p.clone());
+
+// Escala de desplazamiento noise — sutil, no deforma la esfera
+const NOISE_DISP_AMP  = 0.18;   // amplitud máxima de desplazamiento (unidades Three.js)
+const NOISE_DISP_FREQ = 0.55;   // frecuencia espacial del noise
+const NOISE_TIME_FREQ = 0.28;   // qué tan rápido evoluciona el noise en el tiempo
+
+// ── Y-position color shift ─────────────────────────────────────────────────────
+// Módula la luminosidad del nodo según su posición Y actual (post-rotación aparente)
+// Como la malla rota en múltiples ejes, el "Y actual" cambia continuamente → efecto aurora
+const Y_SHIFT_AMP = 0.12;  // ±12% variación de luminosidad por posición Y
 export function setNeuralIntensity(v) { neuralIntensity = v; }
 export function setNodeHSL(h, s, l)   { /* gestionado por aurora */ }
 
@@ -155,10 +181,35 @@ export function updateNeuralWave(time) {
 
     // ── Nodos ─────────────────────────────────────────────────────────────────
     for (let idx = 0; idx < NEURAL_NODE_COUNT; idx++) {
-        const dist = nodeDistances[idx];
+        const base = nodeBasePositions[idx];
+
+        // ── Noise displacement: desplaza cada nodo desde su posición base ──────
+        // El noise evoluciona con el tiempo → los puntos se mueven orgánicamente
+        const nx = base.x * NOISE_DISP_FREQ + time * NOISE_TIME_FREQ;
+        const ny = base.y * NOISE_DISP_FREQ + time * NOISE_TIME_FREQ * 0.7;
+        const nz = base.z * NOISE_DISP_FREQ + time * NOISE_TIME_FREQ * 0.9;
+        // Tres canales de noise independientes para XYZ (offset 100/200 evita correlación)
+        const dispX = (vNoise(nx,        ny + 13.7, nz + 7.3)  - 0.5) * 2 * NOISE_DISP_AMP;
+        const dispY = (vNoise(nx + 100,  ny + 5.1,  nz + 21.9) - 0.5) * 2 * NOISE_DISP_AMP;
+        const dispZ = (vNoise(nx + 200,  ny + 31.4, nz + 3.7)  - 0.5) * 2 * NOISE_DISP_AMP;
+
+        const worldX = base.x + dispX;
+        const worldY = base.y + dispY;
+        const worldZ = base.z + dispZ;
+
+        nodeMeshes[idx].position.set(worldX, worldY, worldZ);
+
+        // Distancia real (post-displacement) para la onda de brillo
+        const dist = Math.sqrt(worldX*worldX + worldY*worldY + worldZ*worldZ);
 
         // Hue del nodo = su offset espacial + desplazamiento temporal global
         const hue = (nodeHueOffset[idx] + globalHueShift) % 1.0;
+
+        // ── Y-position color shift: luminosidad modulada por altura actual ──────
+        // worldY varía entre ≈ -NEURAL_RADIUS y +NEURAL_RADIUS
+        // → normalizado a [-1, 1] → boost/atenuación de luz
+        const yNorm     = Math.max(-1, Math.min(1, worldY / NEURAL_RADIUS));
+        const yLightMod = yNorm * Y_SHIFT_AMP; // +Y = más brillante, -Y = más oscuro
 
         // Intensidad de onda de brillo en este nodo
         let maxWave = 0;
@@ -167,22 +218,16 @@ export function updateNeuralWave(time) {
             if (wi > maxWave) maxWave = wi;
         }
 
-        // Luminosidad: base + boost de onda + boost de neuralIntensity
+        // Luminosidad: base + boost de onda + Y-shift + boost de neuralIntensity
         const lightBoost = maxWave * 0.25 * neuralIntensity;
-        const light = Math.min(AURORA_LIGHT + lightBoost, 0.82);
-
-        // FIX: BasicMaterial — solo color, no emissive
-        // Luminosidad más baja base para que el color se vea vivo, no quemado
-        const lightFinal = Math.min(AURORA_LIGHT + lightBoost, 0.72);
+        const lightFinal = Math.min(AURORA_LIGHT + lightBoost + yLightMod, 0.72);
         _nc.setHSL(hue, AURORA_SAT, lightFinal);
 
         const mat = nodeMaterials[idx];
         mat.color.copy(_nc);
 
-        // FIX: frecuencia y amplitud únicas por nodo — pulsado verdaderamente individual
-        // nodeHueOffset se reutiliza como seed de variación (ya es único por posición)
-        const freqVariation  = 0.9 + nodeHueOffset[idx] * 1.4;   // 0.9 – 2.3 Hz
-        const ampVariation   = 0.08 + nodeHueOffset[idx] * 0.10; // 8% – 18% amplitud
+        const freqVariation  = 0.9 + nodeHueOffset[idx] * 1.4;
+        const ampVariation   = 0.08 + nodeHueOffset[idx] * 0.10;
         const breathe   = 1 + Math.sin(time * freqVariation + idx * 0.41) * ampVariation;
         const waveScale = 1 + maxWave * 0.45;
         const sc = breathe * waveScale;
@@ -197,16 +242,23 @@ export function updateNeuralWave(time) {
         const hueA = (nodeHueOffset[iA] + globalHueShift) % 1.0;
         const hueB = (nodeHueOffset[iB] + globalHueShift) % 1.0;
 
+        // Y-position shift en líneas — usa posición actual desplazada del nodo
+        const posA = nodeMeshes[iA].position;
+        const posB = nodeMeshes[iB].position;
+        const yModA = Math.max(-1, Math.min(1, posA.y / NEURAL_RADIUS)) * Y_SHIFT_AMP * 0.7;
+        const yModB = Math.max(-1, Math.min(1, posB.y / NEURAL_RADIUS)) * Y_SHIFT_AMP * 0.7;
+
         // Boost de brillo en líneas según onda
         let wA = 0, wB = 0;
+        const dA = posA.length(), dB = posB.length();
         for (let w = 0; w < 3; w++) {
-            wA = Math.max(wA, waveIntensity(nodeDistances[iA], waveRadii[w]));
-            wB = Math.max(wB, waveIntensity(nodeDistances[iB], waveRadii[w]));
+            wA = Math.max(wA, waveIntensity(dA, waveRadii[w]));
+            wB = Math.max(wB, waveIntensity(dB, waveRadii[w]));
         }
 
-        _lc.setHSL(hueA, AURORA_SAT, Math.min(LINE_LIGHT + wA * 0.2, 0.65));
+        _lc.setHSL(hueA, AURORA_SAT, Math.min(LINE_LIGHT + wA * 0.2 + yModA, 0.65));
         colorAttr.setXYZ(e*2,   _lc.r, _lc.g, _lc.b);
-        _lc.setHSL(hueB, AURORA_SAT, Math.min(LINE_LIGHT + wB * 0.2, 0.65));
+        _lc.setHSL(hueB, AURORA_SAT, Math.min(LINE_LIGHT + wB * 0.2 + yModB, 0.65));
         colorAttr.setXYZ(e*2+1, _lc.r, _lc.g, _lc.b);
     }
     colorAttr.needsUpdate = true;

@@ -416,6 +416,81 @@ planetas.forEach((def, idx) => {
 });
 
 // =============================================
+// TRAILS DE PLANETAS — estelas que se desvanecen
+// =============================================
+const TRAIL_LENGTH = 28;         // número de puntos históricos por planeta
+const TRAIL_FADE_EXP = 1.8;      // curvatura del fade (>1 = desvanece rápido al final)
+
+// Estructura por planeta: array circular de posiciones pasadas
+const planetTrails = planetFigures.map(planet => {
+    const positions = [];
+    for (let i = 0; i < TRAIL_LENGTH; i++) {
+        positions.push(planet.position.clone());
+    }
+    return { positions, head: 0 };
+});
+
+// Una geometría de línea por planeta, TRAIL_LENGTH vértices en loop
+const planetTrailMeshes = planetFigures.map((planet, pi) => {
+    const pts = new Float32Array(TRAIL_LENGTH * 3);
+    const cols = new Float32Array(TRAIL_LENGTH * 3);
+    const col = new THREE.Color(planet.userData.color);
+
+    for (let i = 0; i < TRAIL_LENGTH; i++) {
+        pts[i*3]   = planet.position.x;
+        pts[i*3+1] = planet.position.y;
+        pts[i*3+2] = planet.position.z;
+        const alpha = Math.pow(1 - i / TRAIL_LENGTH, TRAIL_FADE_EXP);
+        cols[i*3]   = col.r * alpha;
+        cols[i*3+1] = col.g * alpha;
+        cols[i*3+2] = col.b * alpha;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pts,  3));
+    geo.setAttribute('color',    new THREE.BufferAttribute(cols, 3));
+
+    const mat = new THREE.LineBasicMaterial({
+        vertexColors: true,
+        transparent: true, opacity: 0.55,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+
+    const line = new THREE.Line(geo, mat);
+    scene.add(line);
+    return { geo, col };
+});
+
+// Actualizar trails — llamar desde main.js en el loop de animación de planetas
+export function updatePlanetTrails() {
+    planetFigures.forEach((planet, pi) => {
+        const trail  = planetTrails[pi];
+        const { geo, col } = planetTrailMeshes[pi];
+
+        // Guardar posición actual en el buffer circular
+        trail.positions[trail.head].copy(planet.position);
+        trail.head = (trail.head + 1) % TRAIL_LENGTH;
+
+        const posAttr = geo.attributes.position;
+        const colAttr = geo.attributes.color;
+
+        // Rellenar la geometría en orden cronológico inverso: [0]=más reciente
+        for (let i = 0; i < TRAIL_LENGTH; i++) {
+            const idx = (trail.head - 1 - i + TRAIL_LENGTH) % TRAIL_LENGTH;
+            const p   = trail.positions[idx];
+            posAttr.setXYZ(i, p.x, p.y, p.z);
+
+            // Alpha: 1 en el punto más reciente → 0 en el más antiguo
+            const alpha = Math.pow(1 - i / TRAIL_LENGTH, TRAIL_FADE_EXP);
+            colAttr.setXYZ(i, col.r * alpha, col.g * alpha, col.b * alpha);
+        }
+
+        posAttr.needsUpdate = true;
+        colAttr.needsUpdate = true;
+    });
+}
+
+// =============================================
 // NAVES
 // =============================================
 export const ships = [];
