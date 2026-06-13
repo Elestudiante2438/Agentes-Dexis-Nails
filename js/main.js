@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { scene, camera, renderer, controls, setTopView, isPageVisible } from './scene.js';
-import { bubble, core, coreMat, dodecahedron, dodecaMat, ring1, ring2, ring3, particleMat, edgesMat, vertexMat, glowShell, ringState } from './nucleus.js';
+import { bubble, core, coreMat, dodecahedron, dodecaMat, ring1, ring2, ring3, particleMat, edgesMat, vertexMat, glowShell, ringState, updateMorphs } from './nucleus.js';
 import { neuralGroup, neuralLineMat, setNeuralIntensity, setNodeHSL, updateNeuralWave, edgePairs, pulseStates } from './neural.js';
 import { starsBg, planetFigures, ships, updateWarp, updatePlanetTrails } from './environment.js';
 import './voice.js';
@@ -33,6 +33,9 @@ function animate() {
     dodecahedron.rotation.y = time * 0.2;
     dodecahedron.rotation.x = Math.sin(time * 0.3) * 0.04;
 
+    // Morph targets — boca/oído del core
+    updateMorphs();
+
     // Anillos — tilt oscilante independiente por eje, más vivos
     ringSwitchTimer += 0.016;
     if (ringSwitchTimer > 5) { ringDirection *= -1; ringSwitchTimer = 0; }
@@ -46,7 +49,7 @@ function animate() {
         ring2.mesh.rotation.z += rs * 0.85;
         ring2.mesh.rotation.x += Math.sin(time * 0.7) * 0.025;
         ring2.mesh.rotation.y += Math.cos(time * 0.9) * 0.018;
-        ring2.mesh.rotation.z += Math.sin(time * 1.5) * 0.008; // eje Z extra
+        ring2.mesh.rotation.z += Math.sin(time * 1.5) * 0.008;
         ring2.mesh.scale.setScalar(1 + Math.sin(time * 1.3) * 0.08);
     }
     if (ring3?.mesh) {
@@ -73,8 +76,6 @@ function animate() {
     planetFigures.forEach(planet => {
         const d = planet.userData;
         d.angle += d.speed;
-        // Órbita circular + bobbing senoidal en Y — flotación tipo "en el espacio"
-        // Cada planeta usa su índice como offset de fase para que no se muevan sincronizados
         const phaseOffset = d.phaseOffset ?? (planet.userData.phaseOffset = Math.random() * Math.PI * 2);
         const bobAmp   = d.bobAmp   ?? (planet.userData.bobAmp   = 0.08 + Math.random() * 0.12);
         const bobFreq  = d.bobFreq  ?? (planet.userData.bobFreq  = 0.3  + Math.random() * 0.4);
@@ -99,14 +100,14 @@ function animate() {
         }
     });
 
-    // Actualizar estelas de planetas
+    // Estelas de planetas
     updatePlanetTrails();
 
-    // Malla neural — rotación multi-eje simultánea: nunca repite ángulo visualmente
+    // Malla neural
     if (neuralGroup) {
         neuralGroup.rotation.y += 0.0006;
         neuralGroup.rotation.x += 0.00022;
-        neuralGroup.rotation.z += Math.sin(time * 0.17) * 0.00018; // eje Z oscilante
+        neuralGroup.rotation.z += Math.sin(time * 0.17) * 0.00018;
     }
     updateNeuralWave(time);
 
@@ -114,20 +115,16 @@ function animate() {
     if (!window.listeningActive && !window.isSpeaking) {
         particleHue = (particleHue + 0.004) % 1;
         particleMat.color.setHSL(particleHue, 1, 0.6);
-        // setNodeHSL reemplaza nodeMat.color.setHSL — aplica HSL suave a todos los nodos
-        // pero con lerp lento para no interrumpir las ondas
         setNodeHSL(particleHue, 1, 0.65);
-        // neuralLineMat.color ya no tiene efecto con vertexColors:true — se omite
     }
 
-    // Warp — hiperespacio
+    // Warp
     updateWarp();
 
     controls.update();
     renderer.render(scene, camera);
 }
 
-// Iniciar animación
 animate();
 
-console.log('✅ Dexis — Universo 3D con malla neural Jarvis');
+console.log('✅ Dexis — Universo 3D con malla neural Jarvis + morph targets activos');
