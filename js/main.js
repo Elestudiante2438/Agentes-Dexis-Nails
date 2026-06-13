@@ -36,6 +36,17 @@ function animate() {
     // Morph targets — boca/oído del core
     updateMorphs();
 
+    // TEST TEMPORAL — borrar después de verificar
+    if (time > 3 && time < 6) {
+        core.morphTargetInfluences[0] = 1; // boca al máximo
+    } else if (time > 6 && time < 9) {
+        core.morphTargetInfluences[0] = 0;
+        core.morphTargetInfluences[1] = 1; // oído al máximo
+    } else if (time > 9) {
+        core.morphTargetInfluences[0] = 0;
+        core.morphTargetInfluences[1] = 0; // esfera pura
+    }
+
     // Anillos — tilt oscilante independiente por eje, más vivos
     ringSwitchTimer += 0.016;
     if (ringSwitchTimer > 5) { ringDirection *= -1; ringSwitchTimer = 0; }

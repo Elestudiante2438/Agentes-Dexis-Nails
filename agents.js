@@ -51,6 +51,9 @@ async function ejecutarAccion(accion, params) {
 }
 
 async function responder(mensaje) {
+    // 🔧 FIX: evitar que se envíe "undefined" a DeepSeek
+    if (!mensaje || mensaje === 'undefined') return "No te escuché bien. ¿Puedes repetir?";
+
     // Saludo inicial
     if (!mensaje || mensaje.trim() === '') {
         return "¡Hola! Soy Dexis, tu asistente delegado por Dexis Nails para orientarte. Somos un salón de belleza especializado en uñas, podología, faciales. También comercializamos colonias y perfumes de marcas árabes. ¿En qué puedo ayudarte hoy?";
@@ -82,7 +85,7 @@ async function responder(mensaje) {
         conversacion_reciente: conversationMemory.slice(-4)
     };
 
-    // Llamar a DeepSeek — ya tiene try/catch interno, siempre devuelve algo
+    // Llamar a DeepSeek
     const respuestaObj = await llamarDeepSeek(mensaje, contexto);
 
     // Ejecutar acción si viene
@@ -90,7 +93,7 @@ async function responder(mensaje) {
         await ejecutarAccion(respuestaObj.accion, respuestaObj.params);
     }
 
-    // Guardar conversación en segundo plano (no bloquea, no importa si falla)
+    // Guardar conversación en segundo plano
     fetch('/.netlify/functions/guardar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -134,4 +137,4 @@ window.decidirAgente = (texto) => {
     return 'Tejedora';
 };
 
-console.log('🤖 Dexis orquestador listo');
+console.log('🤖 Dexis orquestador listo (con fix para undefined)');
