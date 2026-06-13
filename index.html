@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Dexis · Asistente Personal + Universo 3D</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div id="shortcuts">⌨️ E: Escuchar | M: Silenciar | R: Reset cámara | Di "Dexis" o "ayuda" si te pierdes</div>
+    <div id="statusMsg">⚪ Sistema listo</div>
+
+    <!-- BOTONES TÁCTILES PARA MÓVIL -->
+    <div id="mobile-buttons">
+        <button id="btn-listen" class="voice-btn">🎙️ Escuchar</button>
+        <button id="btn-stop" class="voice-btn">🔇 Silenciar</button>
+        <button id="btn-reset" class="voice-btn">🔄 Reset</button>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script src="/agents.js"></script>
+    <script type="module" src="/js/main.js"></script>
+</body>
+</html>
