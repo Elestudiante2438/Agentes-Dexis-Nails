@@ -1,4 +1,4 @@
-javascript
+
 import * as THREE from 'three';
 import { scene, camera, renderer, controls, setTopView, isPageVisible } from './scene.js';
 import { bubble, core, coreMat, dodecahedron, dodecaMat, ring1, ring2, ring3,
