@@ -190,7 +190,7 @@ for (let i = 0; i < PARTICLE_COUNT; i++) {
     particleColors[i*3]   = _initCol.r;
     particleColors[i*3+1] = _initCol.g;
     particleColors[i*3+2] = _initCol.b;
-    pSizes[i] = 0.028 + Math.random() * 0.022;
+    pSizes[i] = 0.038 + Math.random() * 0.030;
 }
 
 particleGeo.setAttribute('position', new THREE.BufferAttribute(currentPos, 3));
@@ -211,10 +211,10 @@ function makeGlowSprite() {
 }
 
 export const particleMat = new THREE.PointsMaterial({
-    size: 0.038,
+    size: 0.055,
     map: makeGlowSprite(),
     vertexColors: true,
-    transparent: true, opacity: 0.92,
+    transparent: true, opacity: 0.95,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     sizeAttenuation: true,
@@ -222,6 +222,7 @@ export const particleMat = new THREE.PointsMaterial({
 });
 
 const particleSystem = new THREE.Points(particleGeo, particleMat);
+particleSystem.scale.setScalar(1.4);
 particleSystem.position.copy(CENTER);
 
 const brainGroup = new THREE.Group();
@@ -235,9 +236,9 @@ scene.add(brainGroup);
 // =============================================
 const dodecaGeo = new THREE.DodecahedronGeometry(1.45, 0);
 export const dodecaMat = new THREE.MeshStandardMaterial({
-    color: 0x8052ff, emissive: 0x2a1a88, emissiveIntensity: 0.5,
+    color: 0x8052ff, emissive: 0x2a1a88, emissiveIntensity: 0.4,
     metalness: 0.95, roughness: 0.15,
-    transparent: true, opacity: 0.18,
+    transparent: true, opacity: 0.06,
     side: THREE.DoubleSide,
 });
 export const dodecahedron = new THREE.Mesh(dodecaGeo, dodecaMat);
@@ -409,7 +410,8 @@ export function setListeningMode() {
     bubbleMat.emissiveIntensity = 0.18;
     bubbleMat.opacity = 0.05;
     dodecaMat.emissive.setHex(0x15846e);
-    dodecaMat.emissiveIntensity = 0.4;
+    dodecaMat.emissiveIntensity = 0.5;
+    dodecaMat.opacity = 0.06;          // mantener transparente para ver el oído
     dodecaMat.color.setHex(0x15846e);
     if (ring1?.mat) { ring1.mat.color.setHex(0x15846e); ring1.mat.emissiveIntensity = 1.4; }
     if (ring2?.mat) { ring2.mat.emissiveIntensity = 1.0; }
@@ -425,7 +427,8 @@ export function setSpeakingMode() {
     bubbleMat.emissiveIntensity = 0.22;
     bubbleMat.opacity = 0.07;
     dodecaMat.emissive.setHex(0xcc7700);
-    dodecaMat.emissiveIntensity = 0.6;
+    dodecaMat.emissiveIntensity = 0.7;
+    dodecaMat.opacity = 0.07;          // mantener transparente para ver la boca
     dodecaMat.color.setHex(0xffb829);
     if (ring1?.mat) { ring1.mat.color.setHex(0x8052ff); ring1.mat.emissiveIntensity = 2.0; }
     if (ring2?.mat) { ring2.mat.color.setHex(0xffb829); ring2.mat.emissiveIntensity = 2.2; }

@@ -1,4 +1,4 @@
-import { setListeningMode, setSpeakingMode, setSilenceMode, setListeningActive } from './nucleus.js';
+import { setListeningMode, setSpeakingMode, setSilenceMode, setListeningActive, initAudioAnalyser, disconnectAudioAnalyser } from './nucleus.js';
 import { setWarpVoice, setWarpListen, setWarpIdle } from './environment.js';
 import { setNeuralIntensity } from './neural.js';
 
@@ -6,6 +6,9 @@ let isSpeaking = false;
 let listeningActive = false;
 let recognition = null;
 export let currentRingSpeed = 0.03;
+
+// Web Audio para animar la boca con TTS real
+let audioCtxTTS = null;
 
 async function callDeepSeekDirectly(userText) {
     try {
@@ -134,9 +137,21 @@ function speakResponse(text) {
     u.lang = 'es-CO';
     u.rate = 0.9;
 
+    // 🎤 Web Audio: conectar análisis de amplitud para animar la boca
+    try {
+        if (!audioCtxTTS) audioCtxTTS = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtxTTS.state === 'suspended') audioCtxTTS.resume();
+        const dest = audioCtxTTS.createMediaStreamDestination();
+        const sourceNode = audioCtxTTS.createMediaStreamSource(dest.stream);
+        initAudioAnalyser(sourceNode, audioCtxTTS);
+    } catch(e) {
+        console.warn('[Voice] Web Audio TTS no disponible:', e.message);
+    }
+
     u.onend = () => {
         isSpeaking = false;
         window.isSpeaking = false;
+        disconnectAudioAnalyser();
         setListeningMode();
         setNeuralIntensity(2.0);
         setWarpListen();
@@ -151,6 +166,7 @@ function speakResponse(text) {
     u.onerror = () => {
         isSpeaking = false;
         window.isSpeaking = false;
+        disconnectAudioAnalyser();
         setSilenceMode();
         setNeuralIntensity(1.0);
         setWarpIdle();
