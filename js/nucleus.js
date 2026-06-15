@@ -522,4 +522,4 @@ export function resetToIdle() {
     console.log('[Nucleus] resetToIdle — cerebro restaurado');
 }
 
-console.log('✅ Nucleus — Diseño MD integrado (cerebro/flor/concha)');
+console.log('✅ Nucleus — Diseño MD integrado (cerebro/flor/concha)');// force cache Mon Jun 15 01:20:57 HPS 2026
