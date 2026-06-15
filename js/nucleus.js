@@ -28,13 +28,12 @@ let analyser     = null;
 let freqData     = null;
 let audioActive  = false;
 
-// Inicializa el contexto de audio y conecta la fuente (stream de micrófono o síntesis)
 export function initAudioAnalyser(sourceNode, context) {
     try {
         audioCtx  = context;
         analyser  = audioCtx.createAnalyser();
-        analyser.fftSize        = 256;    // 128 bins de frecuencia
-        analyser.smoothingTimeConstant = 0.75; // suavizado temporal
+        analyser.fftSize        = 256;
+        analyser.smoothingTimeConstant = 0.75;
         freqData  = new Uint8Array(analyser.frequencyBinCount);
         sourceNode.connect(analyser);
         audioActive = true;
@@ -54,111 +53,143 @@ export function disconnectAudioAnalyser() {
     freqData    = null;
 }
 
-// Lee la amplitud RMS de las frecuencias de voz (300–3000 Hz)
-// Retorna 0..1 normalizado
 function readVoiceAmplitude() {
     if (!audioActive || !analyser || !freqData) return 0;
     analyser.getByteFrequencyData(freqData);
-
-    // Frecuencias de voz humana: bins ~3 a ~30 con fftSize=256, sampleRate~44100
     const binStart = 3;
     const binEnd   = Math.min(30, freqData.length - 1);
     let sum = 0;
     for (let b = binStart; b <= binEnd; b++) sum += freqData[b];
     const avg = sum / (binEnd - binStart + 1);
-
-    // Normalizar 0..255 → 0..1, con umbral de ruido de fondo (~20/255)
     return Math.max(0, (avg - 20) / 200);
 }
 
 // =============================================
 // SISTEMA DE PARTÍCULAS MORFOLÓGICAS
 // =============================================
-const PARTICLE_COUNT = 1800;
+const PARTICLE_COUNT = 2200;  // más densidad para detalles finos
 const CENTER = new THREE.Vector3(0, 0.5, 0);
 
-// Colores base por modo
-const COLOR_BRAIN  = { h: 0.72, s: 1.0, l: 0.62 }; // Plum Voltage
-const COLOR_MOUTH  = { h: 0.12, s: 1.0, l: 0.60 }; // Amber Spark
-const COLOR_EAR    = { h: 0.47, s: 0.9, l: 0.55 }; // Lichen teal
-const COLOR_ACCENT = { h: 0.08, s: 1.0, l: 0.70 }; // warm highlight
+const COLOR_BRAIN  = { h: 0.72, s: 1.0, l: 0.62 };
+const COLOR_MOUTH  = { h: 0.12, s: 1.0, l: 0.60 };
+const COLOR_EAR    = { h: 0.47, s: 0.9, l: 0.55 };
+const COLOR_ACCENT = { h: 0.08, s: 1.0, l: 0.70 };
 
-// ── Generadores de forma ──────────────────────────────────────────────────────
-
-// CEREBRO — elipsoide con surcos sinusoidales procedurales
+// ──────────────────────────────────────────────────────────
+// 1. CEREBRO — elipsoide con surcos y cisura interhemisférica
+// ──────────────────────────────────────────────────────────
 function brainPoint(i, total) {
     const phi   = Math.acos(1 - 2 * (i + 0.5) / total);
     const theta = Math.PI * (1 + Math.sqrt(5)) * i;
 
-    let x = 1.05 * Math.sin(phi) * Math.cos(theta);
-    let y = 0.82 * Math.sin(phi) * Math.sin(theta);
-    let z = 0.78 * Math.cos(phi);
+    let x = 1.0 * Math.sin(phi) * Math.cos(theta);
+    let y = 0.85 * Math.sin(phi) * Math.sin(theta);
+    let z = 0.75 * Math.cos(phi);
 
-    // Cisura interhemisférica
     const topRegion = Math.max(0, y);
     const midX      = Math.abs(x);
-    const fissure   = Math.exp(-midX * 8) * topRegion * 0.28;
+    const fissure   = Math.exp(-midX * 7) * topRegion * 0.2;
     y -= fissure;
 
-    // Circunvoluciones procedurales
     const gyri =
-        Math.sin(x * 9.3 + y * 5.1) * 0.045 +
-        Math.sin(y * 7.7 + z * 6.2) * 0.038 +
-        Math.sin(z * 11.1 + x * 4.3) * 0.030 +
-        Math.sin(x * 14.2 - z * 8.8) * 0.022;
+        Math.sin(x * 8.5 + y * 4.5) * 0.05 +
+        Math.sin(y * 6.5 + z * 5.5) * 0.04 +
+        Math.sin(z * 10.2 + x * 3.8) * 0.03;
 
-    const frontal   = Math.exp(-Math.pow(z - 0.6, 2) * 4) * 0.12;
-    const occipital = Math.exp(-Math.pow(z + 0.7, 2) * 5) * 0.08;
+    const frontal   = Math.exp(-Math.pow(z - 0.6, 2) * 5) * 0.1;
+    const occipital = Math.exp(-Math.pow(z + 0.7, 2) * 6) * 0.07;
 
-    const r = 0.72 + gyri + frontal + occipital;
-    return new THREE.Vector3(x * r / 1.05, y * r / 0.82, z * r / 0.78);
+    const r = 0.75 + gyri + frontal + occipital;
+    return new THREE.Vector3(x * r, y * r, z * r);
 }
 
-// BOCA — contorno labial animado con amplitud real de voz
+// ──────────────────────────────────────────────────────────
+// 2. BOCA — labios humanos reales con arco de Cupido y volumen
+// ──────────────────────────────────────────────────────────
 function mouthPoint(i, total, time = 0, amplitude = 0) {
-    const t = (i / total) * Math.PI * 2;
+    const t = i / total;
+    const angle = t * Math.PI * 2;
 
-    const lipShape = Math.abs(Math.cos(t * 0.5));
-    const rx = 0.65 * lipShape;
-    const ry = 0.22 * lipShape;
+    const rx = 0.68;
+    const ry = 0.32;
+    let x = Math.cos(angle) * rx;
+    let y = Math.sin(angle) * ry;
 
-    let x = Math.cos(t) * rx;
-    let y = Math.sin(t) * ry;
-    const z = (Math.random() - 0.5) * 0.04;
+    // Arco de Cupido (pico superior)
+    if (y > 0 && Math.abs(x) < 0.35) {
+        const cupid = 0.08 * (1 - Math.abs(x) / 0.35) * Math.sin(angle * 3);
+        y += cupid;
+    }
 
-    // Abertura: modulada por amplitud real de voz
-    const isLower = Math.sin(t) < 0;
-    const opening = amplitude * 0.35 * Math.sin(time * 18) * (isLower ? -1 : 1);
-    y += opening;
+    // Labio inferior más carnoso
+    if (y < 0) {
+        const chin = 0.05 * (1 - Math.abs(x) / 0.6) * (1 + Math.sin(angle));
+        y -= chin;
+    }
 
-    // Vibración de labios proporcional a la intensidad
-    const vibration = amplitude * 0.06 * Math.sin(t * 6 + time * 25);
-    x += vibration;
+    // Profundidad con volumen
+    let z = (Math.random() - 0.5) * 0.12;
+    const centerFactor = Math.cos(angle) * Math.cos(angle);
+    z += centerFactor * 0.06;
+
+    // Apertura animada (boca abierta)
+    if (amplitude > 0) {
+        const open = amplitude * 0.22;
+        if (y > 0) y += open;
+        if (y < 0) y -= open * 0.8;
+        if (Math.abs(x) > 0.5) x += open * 0.2 * (x > 0 ? 1 : -1);
+    }
+
+    const vibrate = amplitude * 0.025 * Math.sin(angle * 12 + time * 30);
+    x += vibrate;
+    y += vibrate * 0.5;
 
     return new THREE.Vector3(x, y, z);
 }
 
-// OÍDO — espiral de concha con antihelix
+// ──────────────────────────────────────────────────────────
+// 3. OÍDO — pabellón auricular real (hélice, concha, lóbulo)
+// ──────────────────────────────────────────────────────────
 function earPoint(i, total) {
-    const t = (i / total);
-    const spiralTurns = 3.2;
-    const angle  = t * Math.PI * 2 * spiralTurns;
-    const radius = (1 - t) * 0.68;
+    const t = i / total;
+    const turns = 2.8;
+    const angle = t * Math.PI * 2 * turns;
+    let r = (1 - t) * 0.82;
 
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius * 0.55;
+    const helix = (1 - t) * 0.18 * Math.sin(angle * 1.5);
+    r += helix;
 
-    const outerBulge = (1 - t) * Math.sin(angle * 0.5) * 0.22;
-    const y = outerBulge + t * 0.08;
+    let x = Math.cos(angle) * r;
+    let z = Math.sin(angle) * r * 0.65;
+    let y = t * 0.35;
 
-    const antihelix = t > 0.5
-        ? Math.exp(-Math.pow(t - 0.7, 2) * 20) * 0.18
-        : 0;
+    if (t < 0.2) {
+        const lobe = Math.sin(t * Math.PI) * 0.12;
+        y -= lobe;
+        z -= lobe * 0.5;
+    }
 
-    return new THREE.Vector3(x, y + antihelix, z);
+    if (t > 0.35 && t < 0.7) {
+        const conchaDepth = Math.sin((t - 0.35) / 0.35 * Math.PI) * 0.14;
+        z -= conchaDepth;
+        y += 0.02;
+    }
+
+    if (t > 0.25 && t < 0.55) {
+        const antihelix = Math.sin((t - 0.25) / 0.3 * Math.PI) * 0.1;
+        z += antihelix;
+        x += antihelix * 0.3;
+    }
+
+    const jitter = (Math.random() - 0.5) * 0.02;
+    x += jitter;
+    y += jitter * 0.5;
+    z += jitter * 0.5;
+
+    return new THREE.Vector3(x, y, z);
 }
 
-// ── Buffers de posición para los 3 estados ───────────────────────────────────
+// ── Buffers de posición para los 3 estados ─────────────────
 const posBrain = new Float32Array(PARTICLE_COUNT * 3);
 const posMouth = new Float32Array(PARTICLE_COUNT * 3);
 const posEar   = new Float32Array(PARTICLE_COUNT * 3);
@@ -174,7 +205,7 @@ for (let i = 0; i < PARTICLE_COUNT; i++) {
     posEar[i*3]   = e.x; posEar[i*3+1] = e.y; posEar[i*3+2] = e.z;
 }
 
-// ── Geometría y material de partículas ───────────────────────────────────────
+// ── Geometría y material de partículas ──────────────────────
 const particleGeo    = new THREE.BufferGeometry();
 const currentPos     = new Float32Array(PARTICLE_COUNT * 3);
 const particleColors = new Float32Array(PARTICLE_COUNT * 3);
@@ -268,7 +299,7 @@ Array.from(vertexMap.values()).forEach(v => {
     dodecahedron.add(p);
 });
 
-// ── Anillos orbitales ─────────────────────────────────────────────────────────
+// ── Anillos orbitales ───────────────────────────────────────
 function makeRing(radius, tube, color, emissive, rotX, rotZ) {
     const mat = new THREE.MeshStandardMaterial({
         color, emissive, emissiveIntensity: 0.9,
@@ -284,7 +315,6 @@ function makeRing(radius, tube, color, emissive, rotX, rotZ) {
 export const ring1 = makeRing(1.90, 0.026, 0x8052ff, 0x5030cc, Math.PI / 2, 0);
 export const ring2 = makeRing(2.10, 0.020, 0xffb829, 0xcc7700, Math.PI / 3, Math.PI / 3);
 export const ring3 = makeRing(2.25, 0.016, 0x15846e, 0x0a4a3e, Math.PI / 5, Math.PI * 0.7);
-
 export const ringState = { speed: 0.03 };
 
 // =============================================
@@ -299,7 +329,6 @@ const MORPH_SPEED = 0.028;
 let mouthTime      = 0;
 let mouthAmplitude = 0;
 let targetMouthAmp = 0;
-
 const workPos = new Float32Array(PARTICLE_COUNT * 3);
 const _col    = new THREE.Color();
 
@@ -308,7 +337,6 @@ function getStateBuffer(state) {
     if (state === 1) return posMouth;
     return posEar;
 }
-
 function targetColor(state) {
     if (state === 0) return COLOR_BRAIN;
     if (state === 1) return COLOR_MOUTH;
@@ -318,20 +346,16 @@ function targetColor(state) {
 export function updateMorphs(time) {
     mouthTime = time;
 
-    // ── Web Audio: leer amplitud real si está activo, si no usar target manual ──
     if (audioActive && currentState === 1) {
         const liveAmp = readVoiceAmplitude();
-        // Mezclar amplitud en vivo con suavizado (evita saltos bruscos)
         targetMouthAmp = Math.max(targetMouthAmp * 0.3, liveAmp);
     }
     mouthAmplitude += (targetMouthAmp - mouthAmplitude) * 0.12;
 
-    // Avanzar transición
     if (morphProgress < 1) {
         morphProgress = Math.min(1, morphProgress + MORPH_SPEED);
     }
 
-    // Ease in-out cúbico
     const t = morphProgress < 0.5
         ? 4 * morphProgress * morphProgress * morphProgress
         : 1 - Math.pow(-2 * morphProgress + 2, 3) / 2;
@@ -346,8 +370,6 @@ export function updateMorphs(time) {
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
         const idx = i * 3;
-
-        // Boca animada desde morphProgress > 0.3 — nace vibrando mientras migra
         let tx = toBuf[idx], ty = toBuf[idx+1], tz = toBuf[idx+2];
         if (morphTo === 1 && morphProgress > 0.3) {
             const ampScale = Math.min(1, (morphProgress - 0.3) / 0.4);
@@ -382,7 +404,6 @@ export function updateMorphs(time) {
     }
 }
 
-// Buffer snapshot para transiciones encadenadas
 const morphFromSnapshot = new Float32Array(PARTICLE_COUNT * 3);
 let useSnapshot = false;
 
@@ -411,7 +432,7 @@ export function setListeningMode() {
     bubbleMat.opacity = 0.05;
     dodecaMat.emissive.setHex(0x15846e);
     dodecaMat.emissiveIntensity = 0.5;
-    dodecaMat.opacity = 0.06;          // mantener transparente para ver el oído
+    dodecaMat.opacity = 0.06;
     dodecaMat.color.setHex(0x15846e);
     if (ring1?.mat) { ring1.mat.color.setHex(0x15846e); ring1.mat.emissiveIntensity = 1.4; }
     if (ring2?.mat) { ring2.mat.emissiveIntensity = 1.0; }
@@ -421,14 +442,14 @@ export function setListeningMode() {
 
 export function setSpeakingMode() {
     transitionTo(1);
-    targetMouthAmp = 0.5; // fallback si Web Audio no arranca
+    targetMouthAmp = 0.5;
 
     bubbleMat.emissive.setHex(0xffb829);
     bubbleMat.emissiveIntensity = 0.22;
     bubbleMat.opacity = 0.07;
     dodecaMat.emissive.setHex(0xcc7700);
     dodecaMat.emissiveIntensity = 0.7;
-    dodecaMat.opacity = 0.07;          // mantener transparente para ver la boca
+    dodecaMat.opacity = 0.07;
     dodecaMat.color.setHex(0xffb829);
     if (ring1?.mat) { ring1.mat.color.setHex(0x8052ff); ring1.mat.emissiveIntensity = 2.0; }
     if (ring2?.mat) { ring2.mat.color.setHex(0xffb829); ring2.mat.emissiveIntensity = 2.2; }
@@ -457,7 +478,7 @@ export function setListeningActive(active) {
     listeningActiveGlobal = active;
 }
 
-// ── GlowShell — nube orbital de partículas que pulsan con el beat ────────────
+// ── GlowShell — nube orbital de partículas que pulsan con el beat ─────────────
 const GLOW_COUNT = 320;
 const glowPos    = new Float32Array(GLOW_COUNT * 3);
 const glowBaseR  = new Float32Array(GLOW_COUNT);
@@ -525,12 +546,10 @@ export const glowShell = {
 export const core    = brainGroup;
 export const coreMat = particleMat;
 
-// Control manual de amplitud (fallback sin Web Audio)
 export function setMouthAmplitude(amp) {
     targetMouthAmp = Math.max(0, Math.min(1, amp));
 }
 
-// Reset total al estado base
 export function resetToIdle() {
     useSnapshot    = false;
     morphFrom      = 0;
